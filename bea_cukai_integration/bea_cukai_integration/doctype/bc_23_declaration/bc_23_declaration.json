@@ -1,14 +1,18 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:BC-{YYYY}-{#####}",
  "creation": "2026-10-05 13:40:02.868765",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "header_section",
   "doc_type",
+  "erp_bc_reference",
   "no_aju",
   "tgl_aju",
+  "no_daftar",
+  "tgl_daftar",
   "supplier_name",
   "column_break_hprw",
   "uom_name",
@@ -17,7 +21,6 @@
   "bruto",
   "currency",
   "detail_section",
-  "erp_bc_reference",
   "cif_value",
   "bm",
   "ppn",
@@ -85,13 +88,23 @@
   },
   {
    "fieldname": "no_aju",
-   "fieldtype": "Float",
+   "fieldtype": "Data",
    "label": "No Aju"
   },
   {
    "fieldname": "tgl_aju",
    "fieldtype": "Date",
    "label": "Tanggal Aju"
+  },
+  {
+   "fieldname": "no_daftar",
+   "fieldtype": "Data",
+   "label": "Nomor Pendaftaran"
+  },
+  {
+   "fieldname": "tgl_daftar",
+   "fieldtype": "Date",
+   "label": "Tanggal Pendaftaran"
   },
   {
    "fetch_from": "erp_bc_reference.supplier_name",
@@ -106,9 +119,7 @@
   {
    "fieldname": "uom_name",
    "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "PACKAGE",
-   "unique": 1
+   "label": "PACKAGE"
   },
   {
    "fieldname": "qty_pack",

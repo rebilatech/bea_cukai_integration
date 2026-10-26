@@ -43,7 +43,7 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Purchase Order": "public/js/purchase_order.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -263,6 +263,15 @@ fixtures = [
 			["name", "in", [
 				"Item-custom_hs_code",
 				"Item-custom_is_bc",
+				"Purchase Receipt-custom_bc_section",
+				"Purchase Receipt-custom_bc_declaration",
+				"Purchase Receipt-custom_bc_doc_type",
+				"Purchase Receipt-custom_bc_no_aju",
+				"Purchase Receipt-custom_bc_col_break",
+				"Purchase Receipt-custom_bc_tgl_aju",
+				"Purchase Receipt-custom_bc_no_daftar",
+				"Purchase Receipt-custom_bc_tgl_daftar",
+				"Purchase Receipt Item-custom_hs_code",
 			]]
 		]
 	},
@@ -275,3 +284,5 @@ fixtures = [
 		]
 	}
 ]
+
+after_migrate = "bea_cukai_integration.custom_fields.setup_custom_fields"
