@@ -253,3 +253,25 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+# Fixtures
+# --------
+fixtures = [
+	{
+		"doctype": "Custom Field",
+		"filters": [
+			["name", "in", [
+				"Item-custom_hs_code",
+				"Item-custom_is_bc",
+			]]
+		]
+	},
+	{
+		"doctype": "Property Setter",
+		"filters": [
+			["name", "in", [
+				"Item-main-field_order",
+			]]
+		]
+	}
+]

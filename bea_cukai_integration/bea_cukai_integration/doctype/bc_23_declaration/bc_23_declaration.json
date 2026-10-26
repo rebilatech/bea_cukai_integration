@@ -1,0 +1,186 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-10-05 13:40:02.868765",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "header_section",
+  "doc_type",
+  "no_aju",
+  "tgl_aju",
+  "supplier_name",
+  "column_break_hprw",
+  "uom_name",
+  "qty_pack",
+  "freight",
+  "bruto",
+  "currency",
+  "detail_section",
+  "erp_bc_reference",
+  "cif_value",
+  "bm",
+  "ppn",
+  "ppn_bm",
+  "is_final",
+  "json_payload",
+  "detail_item",
+  "tab_2_tab",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "header_section",
+   "fieldtype": "Section Break",
+   "label": "Header"
+  },
+  {
+   "fieldname": "erp_bc_reference",
+   "fieldtype": "Link",
+   "label": "ERP\u202fBC\u202fReference",
+   "options": "Purchase Order"
+  },
+  {
+   "fieldname": "doc_type",
+   "fieldtype": "Select",
+   "label": "Document\u202fType",
+   "options": "BC 2.3\nBC 2.7\nBC 4.0\nBC 2.6.2"
+  },
+  {
+   "fieldname": "detail_section",
+   "fieldtype": "Section Break",
+   "label": "Detail"
+  },
+  {
+   "fieldname": "cif_value",
+   "fieldtype": "Currency",
+   "label": "CIF\u202fValue"
+  },
+  {
+   "fieldname": "bm",
+   "fieldtype": "Currency",
+   "label": "Bea\u202fMasuk"
+  },
+  {
+   "fieldname": "ppn",
+   "fieldtype": "Currency",
+   "label": "PPN"
+  },
+  {
+   "fieldname": "ppn_bm",
+   "fieldtype": "Currency",
+   "label": "PPN\u202fBM"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_final",
+   "fieldtype": "Check",
+   "label": "Is\u202fFinal"
+  },
+  {
+   "fieldname": "json_payload",
+   "fieldtype": "Code",
+   "label": "JSON\u202fPayload",
+   "options": "\u202fJSON"
+  },
+  {
+   "fieldname": "no_aju",
+   "fieldtype": "Float",
+   "label": "No Aju"
+  },
+  {
+   "fieldname": "tgl_aju",
+   "fieldtype": "Date",
+   "label": "Tanggal Aju"
+  },
+  {
+   "fetch_from": "erp_bc_reference.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name"
+  },
+  {
+   "fieldname": "column_break_hprw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "uom_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "PACKAGE",
+   "unique": 1
+  },
+  {
+   "fieldname": "qty_pack",
+   "fieldtype": "Int",
+   "label": "Qty Package"
+  },
+  {
+   "fieldname": "tab_2_tab",
+   "fieldtype": "Tab Break",
+   "label": "Tab 2"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "BC_23_Declaration",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "freight",
+   "fieldtype": "Float",
+   "label": "Freight"
+  },
+  {
+   "fieldname": "bruto",
+   "fieldtype": "Float",
+   "label": "Bruto"
+  },
+  {
+   "fetch_from": "erp_bc_reference.currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "detail_item",
+   "fieldtype": "Table",
+   "label": "Detail item",
+   "options": "Purchase Order Item",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-07 13:53:42.484809",
+ "modified_by": "rebilatech@gmail.com",
+ "module": "Bea Cukai Integration",
+ "name": "BC_23_Declaration",
+ "owner": "rebilatech@gmail.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
