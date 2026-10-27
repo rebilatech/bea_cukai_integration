@@ -16,6 +16,11 @@ class BC_Outbound_Declaration(Document):
 			self.no_urut = assembled["no_urut"]
 			self.no_aju = assembled["no_aju"]
 
+	def before_save(self):
+		if not self.raw_materials:
+			from bea_cukai_integration.api.bc_outbound import explode_bom_for_outbound
+			explode_bom_for_outbound(self)
+
 	def validate(self):
 		self.validate_no_aju()
 		self.validate_inbound_history()
@@ -39,24 +44,32 @@ class BC_Outbound_Declaration(Document):
 
 	def validate_inbound_history(self):
 		"""
-		Memastikan setiap baris item pengeluaran WAJIB memiliki riwayat dokumen masuknya
-		(No PO, Dokumen BC Masuk, Harga Masuk).
+		Memastikan riwayat dokumen masuk asal melekat:
+		- Jika item hasil produksi (ada raw_materials dari BOM): validasi setiap bahan baku memiliki dokumen masuk.
+		- Jika barang langsung/trading: validasi setiap item pengeluaran memiliki dokumen masuk.
 		"""
 		missing_history = []
-		for idx, item in enumerate(self.items, start=1):
-			if not item.inbound_bc_declaration:
-				missing_history.append(f"Baris {idx}: Item {item.item_code} belum memiliki Dokumen BC Masuk Asal")
+		if self.raw_materials:
+			for idx, rm in enumerate(self.raw_materials, start=1):
+				if not rm.inbound_bc_declaration:
+					missing_history.append(
+						f"Bahan Baku baris {idx}: {rm.raw_material_item} (untuk Barang Jadi {rm.finished_good_item}) belum memiliki Dokumen BC Masuk Asal"
+					)
+		else:
+			for idx, item in enumerate(self.items, start=1):
+				if not item.inbound_bc_declaration:
+					missing_history.append(f"Baris {idx}: Item {item.item_code} belum memiliki Dokumen BC Masuk Asal")
 
 		if missing_history:
 			bullet = "<br>• " + "<br>• ".join(missing_history)
 			if self.docstatus == 1:
 				frappe.throw(
-					_("Setiap item pengeluaran wajib melekatkan riwayat dokumen masuknya (No PO, No BC, Harga):{0}").format(bullet),
+					_("Setiap pengeluaran pabean wajib melekatkan riwayat dokumen masuknya (No PO, No BC, Harga):{0}").format(bullet),
 					title=_("Wajib History Dokumen Masuk"),
 				)
 			else:
 				frappe.msgprint(
-					_("Peringatan: Beberapa item belum memiliki riwayat dokumen masuk:{0}").format(bullet),
+					_("Peringatan: Beberapa item/bahan baku belum memiliki riwayat dokumen masuk:{0}").format(bullet),
 					alert=True,
 				)
 

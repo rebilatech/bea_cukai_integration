@@ -83,13 +83,12 @@
    "label": "Riwayat Dokumen Masuk Asal (Inbound Traceability)"
   },
   {
-   "description": "Dokumen pabean saat barang ini masuk ke Kawasan Berikat",
+   "description": "Dokumen pabean saat barang ini masuk ke Kawasan Berikat (untuk barang non-produksi)",
    "fieldname": "inbound_bc_declaration",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Dokumen BC Masuk Asal",
-   "options": "BC_23_Declaration",
-   "reqd": 1
+   "options": "BC_23_Declaration"
   },
   {
    "fetch_from": "inbound_bc_declaration.doc_type",

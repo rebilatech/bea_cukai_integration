@@ -37,6 +37,8 @@
   "perkiraan_tgl_kembali",
   "section_items",
   "items",
+  "section_raw_materials",
+  "raw_materials",
   "section_ceisa",
   "json_payload",
   "amended_from"
@@ -228,6 +230,17 @@
    "label": "Rincian Barang Keluar",
    "options": "BC_Outbound_Item",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_raw_materials",
+   "fieldtype": "Section Break",
+   "label": "Bahan Baku Terkandung / Konversi Produksi (BOM Traceability)"
+  },
+  {
+   "fieldname": "raw_materials",
+   "fieldtype": "Table",
+   "label": "Komposisi Bahan Baku Terkandung",
+   "options": "BC_Outbound_Raw_Material"
   },
   {
    "fieldname": "section_ceisa",

@@ -75,6 +75,28 @@ frappe.ui.form.on("BC_Outbound_Declaration", {
 				},
 				__("Actions")
 			);
+
+			frm.add_custom_button(
+				__("Tarik Bahan Baku (BOM Konversi)"),
+				function () {
+					frappe.call({
+						method: "bea_cukai_integration.api.bc_outbound.explode_bom_for_outbound",
+						args: { bc_name: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Menelusuri bahan baku dan riwayat dokumen masuk asal..."),
+						callback: function (r) {
+							if (r.message) {
+								frm.reload_doc();
+								frappe.show_alert({
+									message: __("{0} bahan baku berhasil ditarik dan dilekatkan riwayat masuknya", [r.message.count]),
+									indicator: "green",
+								});
+							}
+						},
+					});
+				},
+				__("Actions")
+			);
 		}
 	},
 

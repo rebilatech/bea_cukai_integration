@@ -418,12 +418,70 @@ def api_create_bc_41():
 	frappe.form_dict["doc_type"] = "BC 4.1"
 	return api_create_outbound_bc()
 
+@frappe.whitelist()
+def explode_bom_for_outbound(bc_name):
+	"""
+	Mendeteksi item barang jadi (Finished Goods) di tabel items yang memiliki BOM,
+	lalu mem-breakdown bahan baku penyusunnya dan otomatis menelusuri riwayat dokumen masuknya
+	(No PO Asal, No BC Masuk, Harga Perolehan Masuk) ke dalam tabel raw_materials.
+	"""
+	bc = frappe.get_doc("BC_Outbound_Declaration", bc_name) if isinstance(bc_name, str) else bc_name
+
+	raw_materials_added = []
+	bc.raw_materials = []
+
+	for item in bc.items:
+		bom_name = frappe.db.get_value("BOM", {"item": item.item_code, "is_active": 1, "is_default": 1}, "name")
+		if not bom_name:
+			bom_name = frappe.db.get_value("BOM", {"item": item.item_code, "is_active": 1}, "name")
+
+		if bom_name:
+			bom = frappe.get_doc("BOM", bom_name)
+			bom_qty = flt(bom.quantity) or 1.0
+			ratio = flt(item.qty) / bom_qty
+
+			for b_item in bom.items:
+				qty_consumed = flt(b_item.qty) * ratio
+				inbound_list = get_inbound_history_for_item(b_item.item_code)
+				latest_inbound = inbound_list[0] if inbound_list else {}
+				hs_code = frappe.db.get_value("Item", b_item.item_code, "custom_hs_code") or ""
+
+				row_dict = {
+					"finished_good_item": item.item_code,
+					"bom_no": bom_name,
+					"raw_material_item": b_item.item_code,
+					"raw_material_name": b_item.item_name or b_item.item_code,
+					"hs_code": hs_code,
+					"qty_consumed": qty_consumed,
+					"uom": b_item.uom or b_item.stock_uom,
+					"inbound_bc_declaration": latest_inbound.get("bc_declaration"),
+					"inbound_bc_type": latest_inbound.get("doc_type"),
+					"inbound_no_aju": latest_inbound.get("no_aju"),
+					"inbound_tgl_aju": latest_inbound.get("tgl_aju"),
+					"inbound_no_daftar": latest_inbound.get("no_daftar"),
+					"inbound_po_reference": latest_inbound.get("po_reference"),
+					"inbound_item_rate": flt(latest_inbound.get("rate") or 0),
+					"inbound_currency": latest_inbound.get("currency"),
+					"inbound_cif_amount": qty_consumed * flt(latest_inbound.get("rate") or 0),
+				}
+				bc.append("raw_materials", row_dict)
+				raw_materials_added.append(row_dict)
+
+	if isinstance(bc_name, str):
+		bc.save(ignore_permissions=True)
+		frappe.db.commit()
+
+	return {
+		"count": len(raw_materials_added),
+		"raw_materials": raw_materials_added,
+	}
+
 
 @frappe.whitelist()
 def generate_outbound_ceisa_payload(bc_name):
 	"""
 	Menghasilkan skema JSON CEISA 4.0 resmi untuk dokumen pengeluaran kepabeanan
-	beserta rincian dokumen asal pabean per itemnya.
+	beserta rincian dokumen asal pabean per itemnya (atau bahan baku jika hasil produksi).
 	"""
 	bc = frappe.get_doc("BC_Outbound_Declaration", bc_name) if isinstance(bc_name, str) else bc_name
 	settings = frappe.get_single("Bea Cukai Settings")
@@ -438,9 +496,29 @@ def generate_outbound_ceisa_payload(bc_name):
 	elif bc.doc_type == "BC 4.1":
 		ceisa_code = "41"
 
+	raw_materials_by_fg = {}
+	if bc.raw_materials:
+		for rm in bc.raw_materials:
+			raw_materials_by_fg.setdefault(rm.finished_good_item, []).append({
+				"kodeBahanBaku": rm.raw_material_item,
+				"uraianBahanBaku": rm.raw_material_name or rm.raw_material_item,
+				"posTarif": rm.hs_code or "",
+				"jumlahPemakaian": flt(rm.qty_consumed),
+				"satuan": rm.uom or "PCE",
+				"dokumenAsal": {
+					"bcMasuk": rm.inbound_bc_declaration or "",
+					"jenisBcMasuk": rm.inbound_bc_type or "",
+					"nomorAjuMasuk": rm.inbound_no_aju or "",
+					"tanggalAjuMasuk": str(rm.inbound_tgl_aju or ""),
+					"nomorDaftarMasuk": rm.inbound_no_daftar or "",
+					"noPoAsal": rm.inbound_po_reference or "",
+					"hargaSatuanMasuk": flt(rm.inbound_item_rate or 0),
+				}
+			})
+
 	barang_list = []
 	for idx, item in enumerate(bc.items, start=1):
-		barang_list.append({
+		item_dict = {
 			"seriBarang": idx,
 			"kodeBarang": item.item_code,
 			"uraian": item.item_name or item.item_code,
@@ -449,8 +527,13 @@ def generate_outbound_ceisa_payload(bc_name):
 			"kodeSatuanBarang": item.uom or "PCE",
 			"fob": flt(item.amount),
 			"hargaPenyerahan": flt(item.amount),
-			# Riwayat Dokumen Pabean Masuk Asal (IT Inventory Lineage)
-			"dokumenAsal": {
+		}
+
+		# Jika ada bahan baku penyusun dari konversi BOM
+		if item.item_code in raw_materials_by_fg:
+			item_dict["bahanBaku"] = raw_materials_by_fg[item.item_code]
+		elif item.inbound_bc_declaration:
+			item_dict["dokumenAsal"] = {
 				"bcMasuk": item.inbound_bc_declaration or "",
 				"jenisBcMasuk": item.inbound_bc_type or "",
 				"nomorAjuMasuk": item.inbound_no_aju or "",
@@ -459,8 +542,8 @@ def generate_outbound_ceisa_payload(bc_name):
 				"noPoAsal": item.inbound_po_reference or "",
 				"hargaSatuanMasuk": flt(item.inbound_item_rate or 0),
 			}
-		})
 
+		barang_list.append(item_dict)
 	payload = {
 		"nomorAju": bc.no_aju or "",
 		"tanggalAju": str(bc.tgl_aju or ""),

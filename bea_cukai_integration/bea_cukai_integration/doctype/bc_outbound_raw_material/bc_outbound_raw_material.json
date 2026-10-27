@@ -1,0 +1,162 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-10-27 12:30:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "finished_good_item",
+  "bom_no",
+  "raw_material_item",
+  "raw_material_name",
+  "hs_code",
+  "qty_consumed",
+  "uom",
+  "sec_dokumen_masuk",
+  "inbound_bc_declaration",
+  "inbound_bc_type",
+  "inbound_no_aju",
+  "inbound_tgl_aju",
+  "col_break2",
+  "inbound_no_daftar",
+  "inbound_po_reference",
+  "inbound_item_rate",
+  "inbound_currency",
+  "inbound_cif_amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "finished_good_item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Barang Jadi (FG)",
+   "options": "Item"
+  },
+  {
+   "fieldname": "bom_no",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "BOM No",
+   "options": "BOM"
+  },
+  {
+   "fieldname": "raw_material_item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Bahan Baku",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "raw_material_item.item_name",
+   "fieldname": "raw_material_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nama Bahan Baku",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "raw_material_item.custom_hs_code",
+   "fieldname": "hs_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "HS Code Bahan Baku"
+  },
+  {
+   "fieldname": "qty_consumed",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Jumlah Pemakaian",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "raw_material_item.stock_uom",
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Satuan",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "sec_dokumen_masuk",
+   "fieldtype": "Section Break",
+   "label": "Dokumen BC Masuk Asal Bahan Baku"
+  },
+  {
+   "fieldname": "inbound_bc_declaration",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Dokumen BC Masuk Asal",
+   "options": "BC_23_Declaration"
+  },
+  {
+   "fetch_from": "inbound_bc_declaration.doc_type",
+   "fieldname": "inbound_bc_type",
+   "fieldtype": "Data",
+   "label": "Jenis BC Masuk",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "inbound_bc_declaration.no_aju",
+   "fieldname": "inbound_no_aju",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "No Aju Masuk Asal",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "inbound_bc_declaration.tgl_aju",
+   "fieldname": "inbound_tgl_aju",
+   "fieldtype": "Date",
+   "label": "Tanggal Aju Masuk",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "inbound_bc_declaration.no_daftar",
+   "fieldname": "inbound_no_daftar",
+   "fieldtype": "Data",
+   "label": "Nomor Pendaftaran Masuk",
+   "read_only": 1
+  },
+  {
+   "fieldname": "inbound_po_reference",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "No PO Beli Bahan Baku"
+  },
+  {
+   "fieldname": "inbound_item_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Harga Satuan Beli Masuk"
+  },
+  {
+   "fieldname": "inbound_currency",
+   "fieldtype": "Link",
+   "label": "Mata Uang Masuk",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "inbound_cif_amount",
+   "fieldtype": "Currency",
+   "label": "Total Nilai Bahan Baku Masuk"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-27 12:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bea Cukai Integration",
+ "name": "BC_Outbound_Raw_Material",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
