@@ -107,11 +107,11 @@
    "label": "Konfigurasi Server API CEISA 4.0"
   },
   {
-   "default": "Production",
+   "default": "Demo / Presentation Mode",
    "fieldname": "ceisa_environment",
    "fieldtype": "Select",
    "label": "Environment",
-   "options": "Production\nSandbox / Testing"
+   "options": "Demo / Presentation Mode\nProduction\nSandbox / Testing"
   },
   {
    "default": "https://apis-gw.beacukai.go.id",

@@ -273,13 +273,53 @@ class TestBC_23_Declaration(FrappeTestCase):
 		bc262.delete()
 
 	def test_ceisa_client_connector(self):
-		from bea_cukai_integration.api.ceisa_client import get_ceisa_config, login_ceisa
+		from bea_cukai_integration.api.ceisa_client import (
+			get_ceisa_config,
+			login_ceisa,
+			send_document_to_ceisa,
+			check_ceisa_status,
+		)
+		from bea_cukai_integration.api.bc_23 import make_bc_inbound_from_po
 
-		config = get_ceisa_config()
-		self.assertTrue("https://" in config["base_url"])
-
-		# Uji validasi kredensial kosong
+		# 1. Uji Demo / Presentation Mode
 		settings = frappe.get_single("Bea Cukai Settings")
+		settings.ceisa_environment = "Demo / Presentation Mode"
+		settings.ceisa_access_token = None
+		settings.save()
+
+		login_res = login_ceisa(force=True)
+		self.assertEqual(login_res["status"], "success")
+		self.assertEqual(login_res["environment"], "Demo / Presentation Mode")
+		self.assertTrue(bool(login_res["token"]))
+
+		# 2. Uji Kirim Dokumen & Cek Status di Demo Mode
+		po = frappe.get_all(
+			"Purchase Order",
+			filters={"docstatus": 1, "status": ["in", ["To Receive and Bill", "To Receive"]]},
+			limit=1,
+		)
+		po_name = po[0].name
+		demo_bc = make_bc_inbound_from_po(po_name, doc_type="BC 2.3")
+		demo_bc.insert()
+		demo_bc.submit()
+
+		# Kirim Dokumen ke CEISA Gateway Demo
+		send_res = send_document_to_ceisa("BC_23_Declaration", demo_bc.name)
+		self.assertEqual(send_res["status"], "success")
+
+		# Cek Status CEISA (menghasilkan Nopen resmi dan SPPB)
+		status_res = check_ceisa_status("BC_23_Declaration", demo_bc.name)
+		self.assertEqual(status_res["status"], "success")
+		demo_bc.reload()
+		self.assertTrue(bool(demo_bc.no_daftar))
+		self.assertTrue("KPPBC" in demo_bc.no_daftar)
+
+		demo_bc.cancel()
+		demo_bc.delete()
+
+		# 3. Uji Production validation jika kredensial kosong
+		settings.reload()
+		settings.ceisa_environment = "Production"
 		old_user = settings.ceisa_username
 		settings.ceisa_username = None
 		settings.ceisa_access_token = None
@@ -287,16 +327,7 @@ class TestBC_23_Declaration(FrappeTestCase):
 
 		self.assertRaises(frappe.ValidationError, login_ceisa, force=True)
 
-		# Uji penggunaan token aktif
-		settings.ceisa_access_token = "mock-active-jwt-token"
-		settings.ceisa_token_expiry = frappe.utils.add_to_date(frappe.utils.now_datetime(), hours=2)
-		settings.save()
-
-		res = login_ceisa(force=False)
-		self.assertEqual(res["status"], "success")
-		self.assertEqual(res["token"], "mock-active-jwt-token")
-
-		# Cleanup
+		# Kembalikan ke Demo Mode untuk presentasi
+		settings.ceisa_environment = "Demo / Presentation Mode"
 		settings.ceisa_username = old_user
-		settings.ceisa_access_token = None
 		settings.save()

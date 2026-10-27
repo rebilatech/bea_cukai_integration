@@ -30,7 +30,24 @@ def login_ceisa(force=False):
 	config = get_ceisa_config()
 	settings = config["settings"]
 
-	# Jika token masih ada dan belum kadaluarsa, gunakan token yang ada
+	# Dukungan Demo / Presentation Mode (Presentasi ke Calon Klien)
+	if config["environment"] == "Demo / Presentation Mode":
+		demo_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW1vX2NlaXNhIiwiaXNzIjoiZGpib19jZWlzYTRfMCIsImV4cCI6MTc5MzIwMDAwMH0.DEMO_SIMULATION_SIGNATURE"
+		expiry_dt = add_to_date(now_datetime(), hours=8)
+		settings.ceisa_access_token = demo_token
+		settings.ceisa_token_expiry = expiry_dt
+		settings.ceisa_last_status = "Terkoneksi (CEISA 4.0 Demo Gateway Aktif)"
+		settings.save(ignore_permissions=True)
+		frappe.db.commit()
+		return {
+			"status": "success",
+			"message": "Autentikasi Gateway CEISA 4.0 Berhasil (Demo Mode)",
+			"token": demo_token,
+			"expiry": str(expiry_dt),
+			"environment": "Demo / Presentation Mode",
+		}
+
+	# Jika token masih ada dan belum kadaluarsa (Production/Sandbox)
 	if not force and config["token"] and config["expiry"]:
 		if get_datetime(config["expiry"]) > now_datetime():
 			return {
@@ -39,7 +56,6 @@ def login_ceisa(force=False):
 				"token": config["token"],
 				"expiry": str(config["expiry"]),
 			}
-
 	if not config["username"] or not config["password"]:
 		frappe.throw(
 			_(
@@ -120,12 +136,34 @@ def send_document_to_ceisa(doctype, docname):
 		doc.reload()
 
 	payload_dict = json.loads(doc.json_payload)
+	config = get_ceisa_config()
 
 	# Dapatkan Token Login CEISA
 	auth_info = login_ceisa()
 	token = auth_info["token"]
 
-	config = get_ceisa_config()
+	# Jika dalam Mode Demo / Presentasi
+	if config["environment"] == "Demo / Presentation Mode":
+		msg = f"Dokumen {doc.doc_type} (No Aju: {doc.no_aju}) berhasil dikirim & tervalidasi di Gateway CEISA 4.0 DJBC."
+		frappe.msgprint(
+			_(
+				"<b>Sukses Kirim CEISA 4.0 (Demo Mode)</b><br>"
+				"Nomor Aju: <b>{0}</b><br>"
+				"Jenis Dokumen: <b>{1}</b><br>"
+				"Status: <b>Dokumen Diterima oleh Sistem CEISA 4.0 DJBC</b><br>"
+				"Waktu Pengiriman: {2}<br><br>"
+				"<i>Silakan klik 'Cek Status CEISA' untuk simulasi penarikan Nopen / SPPB resmi.</i>"
+			).format(doc.no_aju, doc.doc_type, str(now_datetime())),
+			indicator="green",
+			title=_("CEISA 4.0 Gateway"),
+		)
+		return {
+			"status": "success",
+			"message": msg,
+			"nomorAju": doc.no_aju,
+			"statusPabean": "Dokumen Diterima oleh Sistem CEISA 4.0 DJBC",
+		}
+
 	send_url = f"{config['base_url']}/tpb/v1/dokumen"
 	headers = {
 		"Content-Type": "application/json",
@@ -175,11 +213,44 @@ def check_ceisa_status(doctype, docname):
 		frappe.throw(_("Dokumen {0} belum memiliki Nomor Aju").format(docname))
 
 	clean_no_aju = str(doc.no_aju).replace("-", "").strip()
+	config = get_ceisa_config()
+
+	# Jika dalam Mode Demo / Presentasi
+	if config["environment"] == "Demo / Presentation Mode":
+		settings = config["settings"]
+		from frappe.utils import nowdate
+		clean_digits = "".join(filter(str.isdigit, str(doc.no_aju)))
+		seq_suffix = clean_digits[-4:] if len(clean_digits) >= 4 else "0001"
+		kantor = getattr(settings, "kode_kantor", "0403") or "0403"
+		demo_nopen = f"00{seq_suffix}/KPPBC.{kantor}/{now_datetime().year}"
+
+		if not doc.no_daftar:
+			doc.no_daftar = demo_nopen
+			doc.tgl_daftar = nowdate()
+			doc.save(ignore_permissions=True)
+			frappe.db.commit()
+
+		frappe.msgprint(
+			_(
+				"<b>Status Terkini CEISA 4.0 DJBC (Demo Mode):</b><br>"
+				"Nomor Aju: <b>{0}</b><br>"
+				"Jenis Dokumen: <b>{1}</b><br>"
+				"Status Pabean: <span class='badge badge-success' style='font-size: 13px;'>Persetujuan Pabean (SPPB / NPE Terbit)</span><br>"
+				"Nomor Pendaftaran: <b>{2}</b><br>"
+				"Tanggal Pendaftaran: <b>{3}</b><br><br>"
+				"<i>Kolom No Daftar & Tanggal Daftar otomatis diperbarui di ERPNext. Barang siap direalisasikan ke gudang.</i>"
+			).format(doc.no_aju, doc.doc_type, doc.no_daftar, doc.tgl_daftar),
+			indicator="blue",
+			title=_("Status Terkini CEISA 4.0"),
+		)
+		return {
+			"status": "success",
+			"status_dokumen": "Persetujuan Pabean (SPPB / NPE Terbit)",
+			"nomor_daftar": doc.no_daftar,
+			"tanggal_daftar": str(doc.tgl_daftar),
+		}
 
 	auth_info = login_ceisa()
-	token = auth_info["token"]
-
-	config = get_ceisa_config()
 	status_url = f"{config['base_url']}/tpb/v1/dokumen/status/{clean_no_aju}"
 	headers = {
 		"Authorization": f"Bearer {token}",
