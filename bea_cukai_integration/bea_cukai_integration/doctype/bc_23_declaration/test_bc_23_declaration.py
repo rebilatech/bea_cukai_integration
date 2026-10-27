@@ -134,3 +134,37 @@ class TestBC_23_Declaration(FrappeTestCase):
 		res2 = assemble_nomor_aju("BC 2.7", tgl_aju="2026-10-26", no_urut="000123", with_hyphen=True)
 		self.assertEqual(res2["no_urut"], "000123")
 		self.assertEqual(res2["no_aju"], "040327-000001-20261026-000123")
+
+	def test_doctype_sequence_isolation(self):
+		from bea_cukai_integration.api.bc_23 import assemble_nomor_aju, get_current_doc_type_sequence
+
+		test_date = "2026-12-31"
+		frappe.db.sql("DELETE FROM `tabSeries` WHERE name LIKE %s", "NOAJU%20261231")
+
+		# Buat 2 nomor aju berturut-turut untuk BC 2.3 (000001 dan 000002)
+		bc23_1 = assemble_nomor_aju("BC 2.3", tgl_aju=test_date)
+		self.assertEqual(bc23_1["no_urut"], "000001")
+		bc23_2 = assemble_nomor_aju("BC 2.3", tgl_aju=test_date)
+		self.assertEqual(bc23_2["no_urut"], "000002")
+
+		# Buat nomor aju untuk BC 2.7 (harus mulai dari 000001, TIDAK boleh melanjutkan BC 2.3)
+		bc27_1 = assemble_nomor_aju("BC 2.7", tgl_aju=test_date)
+		self.assertEqual(bc27_1["no_urut"], "000001")
+		self.assertNotEqual(bc27_1["no_urut"], bc23_2["no_urut"])
+
+		# Buat nomor aju untuk BC 4.0 (harus mulai dari 000001 secara independen)
+		bc40_1 = assemble_nomor_aju("BC 4.0", tgl_aju=test_date)
+		self.assertEqual(bc40_1["no_urut"], "000001")
+
+		# Buat nomor aju ke-3 untuk BC 2.3 (harus melanjutkan BC 2.3 sendiri: 000003)
+		bc23_3 = assemble_nomor_aju("BC 2.3", tgl_aju=test_date)
+		self.assertEqual(bc23_3["no_urut"], "000003")
+
+		# Verifikasi get_current_doc_type_sequence
+		seq_info_23 = get_current_doc_type_sequence("BC 2.3", tgl_aju=test_date)
+		self.assertEqual(seq_info_23["current_sequence"], 3)
+		seq_info_27 = get_current_doc_type_sequence("BC 2.7", tgl_aju=test_date)
+		self.assertEqual(seq_info_27["current_sequence"], 1)
+
+		# Cleanup
+		frappe.db.sql("DELETE FROM `tabSeries` WHERE name LIKE %s", "NOAJU%20261231")

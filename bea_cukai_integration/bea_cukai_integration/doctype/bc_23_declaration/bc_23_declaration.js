@@ -87,7 +87,30 @@ frappe.ui.form.on("BC_23_Declaration", {
 
 	doc_type(frm) {
 		if (frm.doc.docstatus === 0) {
-			frm.trigger("recalculate_no_aju");
+			// Setiap jenis dokumen memiliki urutan tersendiri (BC 2.3 terpisah dari BC 2.7, BC 4.0, dll).
+			// Ambil sequence baru independen milik jenis dokumen yang baru dipilih:
+			frappe.call({
+				method: "bea_cukai_integration.api.bc_23.assemble_nomor_aju",
+				args: {
+					doc_type: frm.doc.doc_type || "BC 2.3",
+					tgl_aju: frm.doc.tgl_aju,
+					no_urut: null, // Reset dan ambil urutan independen milik doc_type ini
+				},
+				callback: function (r) {
+					if (r.message) {
+						frm.set_value("no_urut", r.message.no_urut);
+						frm.set_value("no_aju", r.message.no_aju);
+						frappe.show_alert({
+							message: __("Urutan diperbarui untuk {0}: {1}", [
+								frm.doc.doc_type,
+								r.message.no_urut,
+							]),
+							indicator: "blue",
+						});
+						frm.trigger("render_no_aju_status");
+					}
+				},
+			});
 		}
 	},
 

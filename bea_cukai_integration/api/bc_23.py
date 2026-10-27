@@ -60,6 +60,27 @@ def generate_nomor_aju(doc_type="BC 2.3", tgl_aju=None, with_hyphen=None):
 	Menghasilkan 26 digit Nomor Aju pabean resmi (DJBC / CEISA 4.0)
 	"""
 	return assemble_nomor_aju(doc_type=doc_type, tgl_aju=tgl_aju, no_urut=None, with_hyphen=with_hyphen)["no_aju"]
+@frappe.whitelist()
+def get_current_doc_type_sequence(doc_type="BC 2.3", tgl_aju=None):
+	"""
+	Melihat nomor urut terakhir yang sedang berjalan untuk jenis dokumen ini pada tanggal tertentu
+	"""
+	if not tgl_aju:
+		tgl_aju = nowdate()
+	date_str = getdate(tgl_aju).strftime("%Y%m%d")
+	doc_code = DOC_TYPE_CODE_MAP.get(doc_type, "23")[:2].zfill(2)
+	series_name = f"NOAJU{doc_code}{date_str}"
+	res = frappe.db.sql("SELECT current FROM `tabSeries` WHERE name = %s", series_name)
+	current = res[0][0] if res and res[0] else 0
+	return {
+		"doc_type": doc_type,
+		"doc_code": doc_code,
+		"date": date_str,
+		"current_sequence": int(current),
+		"next_sequence": int(current) + 1,
+		"next_no_urut": str(int(current) + 1).zfill(6),
+	}
+
 
 @frappe.whitelist()
 def parse_and_validate_no_aju(no_aju):
