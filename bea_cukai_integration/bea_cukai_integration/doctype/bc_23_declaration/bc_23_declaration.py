@@ -8,10 +8,16 @@ from frappe.utils import flt
 
 
 class BC_23_Declaration(Document):
+	def before_insert(self):
+		if not self.no_aju:
+			settings = frappe.get_single("Bea Cukai Settings")
+			if settings.auto_generate_no_aju:
+				from bea_cukai_integration.api.bc_23 import generate_nomor_aju
+				self.no_aju = generate_nomor_aju(self.doc_type or "BC 2.3", self.tgl_aju)
+
 	def validate(self):
 		self.validate_po_reference()
 		self.calculate_totals()
-
 	def validate_po_reference(self):
 		if self.erp_bc_reference:
 			po_status = frappe.db.get_value("Purchase Order", self.erp_bc_reference, "docstatus")

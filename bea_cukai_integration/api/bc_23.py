@@ -4,6 +4,43 @@ from frappe import _
 from frappe.utils import flt, nowdate, getdate
 from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt as erpnext_make_purchase_receipt
 
+DOC_TYPE_CODE_MAP = {
+	"BC 2.3": "23",
+	"BC 2.7": "27",
+	"BC 4.0": "40",
+	"BC 2.6.2": "26",
+}
+
+
+@frappe.whitelist()
+def generate_nomor_aju(doc_type="BC 2.3", tgl_aju=None, with_hyphen=None):
+	"""
+	Menghasilkan 26 digit Nomor Aju pabean resmi (DJBC / CEISA 4.0):
+	Format: KKKK (4 digit Kantor) + DD (2 digit Dokumen) + EEEEEE (6 digit Perusahaan) + YYYYMMDD (8 digit Tanggal) + SSSSSS (6 digit Urut)
+	"""
+	settings = frappe.get_single("Bea Cukai Settings")
+	kode_kantor = (settings.kode_kantor or "0403").strip()[:4].zfill(4)
+	doc_code = DOC_TYPE_CODE_MAP.get(doc_type, "23")[:2].zfill(2)
+	kode_perusahaan = (settings.kode_perusahaan or "000001").strip()[:6].zfill(6)
+
+	if not tgl_aju:
+		tgl_aju = nowdate()
+	date_obj = getdate(tgl_aju)
+	date_str = date_obj.strftime("%Y%m%d")
+
+	# Penomoran sekuensial harian atomik via tabSeries
+	series_key = f"NOAJU.{doc_code}.{date_str}..######"
+	raw_series = str(frappe.model.naming.make_autoname(series_key))
+	serial_no = raw_series[-6:].zfill(6)
+
+	if with_hyphen is None:
+		with_hyphen = bool(settings.no_aju_with_hyphen)
+
+	if with_hyphen:
+		return f"{kode_kantor}{doc_code}-{kode_perusahaan}-{date_str}-{serial_no}"
+	else:
+		return f"{kode_kantor}{doc_code}{kode_perusahaan}{date_str}{serial_no}"
+
 
 @frappe.whitelist()
 def make_bc_23_from_po(source_name, target_doc=None):
@@ -18,6 +55,10 @@ def make_bc_23_from_po(source_name, target_doc=None):
 	bc.erp_bc_reference = po.name
 	bc.doc_type = "BC 2.3"
 	bc.tgl_aju = nowdate()
+	settings = frappe.get_single("Bea Cukai Settings")
+	if settings.auto_generate_no_aju:
+		bc.no_aju = generate_nomor_aju(bc.doc_type, bc.tgl_aju)
+
 	bc.supplier_name = po.supplier_name or po.supplier
 	bc.currency = po.currency
 
@@ -125,8 +166,15 @@ def api_create_bc_23():
 	bc = frappe.new_doc("BC_23_Declaration")
 	bc.erp_bc_reference = po.name
 	bc.doc_type = data.get("doc_type", "BC 2.3")
-	bc.no_aju = str(data.get("no_aju") or "")
 	bc.tgl_aju = data.get("tgl_aju") or nowdate()
+	if data.get("no_aju"):
+		bc.no_aju = str(data.get("no_aju"))
+	else:
+		settings = frappe.get_single("Bea Cukai Settings")
+		if settings.auto_generate_no_aju:
+			bc.no_aju = generate_nomor_aju(bc.doc_type, bc.tgl_aju)
+		else:
+			bc.no_aju = ""
 	bc.no_daftar = data.get("no_daftar")
 	bc.tgl_daftar = data.get("tgl_daftar")
 	bc.supplier_name = data.get("supplier_name") or po.supplier_name or po.supplier

@@ -1,0 +1,117 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-26 12:35:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_kantor",
+  "kode_kantor",
+  "nama_kantor",
+  "col_break1",
+  "kode_perusahaan",
+  "nama_perusahaan",
+  "npwp_perusahaan",
+  "section_no_aju",
+  "auto_generate_no_aju",
+  "no_aju_with_hyphen",
+  "col_break2",
+  "format_preview"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_kantor",
+   "fieldtype": "Section Break",
+   "label": "Kantor Pabean & Perusahaan"
+  },
+  {
+   "default": "0403",
+   "description": "4 digit kode kantor pabean DJBC (Contoh: 0403 untuk KPPBC Purwakarta, 0107 untuk KPU Tanjung Priok)",
+   "fieldname": "kode_kantor",
+   "fieldtype": "Data",
+   "label": "Kode Kantor Pabean (4 Digit)",
+   "reqd": 1
+  },
+  {
+   "default": "KPPBC TMP A Purwakarta",
+   "fieldname": "nama_kantor",
+   "fieldtype": "Data",
+   "label": "Nama Kantor Pabean"
+  },
+  {
+   "fieldname": "col_break1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "000001",
+   "description": "6 digit kode identitas perusahaan di modul pabean / CEISA TPB",
+   "fieldname": "kode_perusahaan",
+   "fieldtype": "Data",
+   "label": "Kode Unik Perusahaan (6 Digit)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "nama_perusahaan",
+   "fieldtype": "Data",
+   "label": "Nama Perusahaan (TPB)"
+  },
+  {
+   "fieldname": "npwp_perusahaan",
+   "fieldtype": "Data",
+   "label": "NPWP Perusahaan"
+  },
+  {
+   "fieldname": "section_no_aju",
+   "fieldtype": "Section Break",
+   "label": "Pengaturan Nomor Aju (26 Digit)"
+  },
+  {
+   "default": "1",
+   "description": "Otomatis menghasilkan 26 digit nomor aju saat dokumen Bea Cukai dibuat",
+   "fieldname": "auto_generate_no_aju",
+   "fieldtype": "Check",
+   "label": "Auto Generate Nomor Aju"
+  },
+  {
+   "default": "1",
+   "description": "Format: KKKKDD-EEEEEE-YYYYMMDD-SSSSSS (Aktif) atau KKKKDDEEEEEEYYYYMMDDSSSSSS (Nonaktif)",
+   "fieldname": "no_aju_with_hyphen",
+   "fieldtype": "Check",
+   "label": "Gunakan Tanda Hubung (-)"
+  },
+  {
+   "fieldname": "col_break2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Format 26 Digit: KKKK (Kantor 4 digit) + DD (Dokumen 2 digit) + EEEEEE (Perusahaan 6 digit) + YYYYMMDD (Tanggal 8 digit) + SSSSSS (Urut 6 digit)",
+   "fieldname": "format_preview",
+   "fieldtype": "Small Text",
+   "label": "Format Standar Pabean",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-26 12:35:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bea Cukai Integration",
+ "name": "Bea Cukai Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

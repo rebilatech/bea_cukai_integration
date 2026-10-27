@@ -38,6 +38,31 @@ frappe.ui.form.on("BC_23_Declaration", {
 				__("Actions")
 			);
 		}
+
+		if (frm.doc.docstatus === 0) {
+			frm.add_custom_button(
+				__("Generate No Aju"),
+				function () {
+					frappe.call({
+						method: "bea_cukai_integration.api.bc_23.generate_nomor_aju",
+						args: {
+							doc_type: frm.doc.doc_type || "BC 2.3",
+							tgl_aju: frm.doc.tgl_aju,
+						},
+						callback: function (r) {
+							if (r.message) {
+								frm.set_value("no_aju", r.message);
+								frappe.show_alert({
+									message: __("Nomor Aju 26 digit berhasil digenerate"),
+									indicator: "blue",
+								});
+							}
+						},
+					});
+				},
+				__("Actions")
+			);
+		}
 	},
 
 	erp_bc_reference(frm) {

@@ -31,8 +31,8 @@ class TestBC_23_Declaration(FrappeTestCase):
 		self.assertEqual(bc.doc_type, "BC 2.3")
 		self.assertTrue(len(bc.detail_item) > 0)
 
-		# Isi data pabean
-		bc.no_aju = "000023-012345-20261026-000001"
+		# Pastikan nomor aju sudah ter-generate otomatis saat make_bc_23_from_po
+		self.assertTrue(bool(bc.no_aju))
 		bc.tgl_aju = "2026-10-26"
 		bc.no_daftar = "001234"
 		bc.tgl_daftar = "2026-10-26"
@@ -43,7 +43,7 @@ class TestBC_23_Declaration(FrappeTestCase):
 
 		# 2. Test CEISA payload generation
 		payload = generate_ceisa_payload(bc.name)
-		self.assertEqual(payload["nomorAju"], "000023-012345-20261026-000001")
+		self.assertEqual(payload["nomorAju"], bc.no_aju)
 		self.assertEqual(payload["kodeDokumen"], "23")
 		self.assertTrue(len(payload["barang"]) > 0)
 
@@ -56,7 +56,7 @@ class TestBC_23_Declaration(FrappeTestCase):
 		pr = make_purchase_receipt_from_bc(bc.name)
 		self.assertEqual(pr.custom_bc_declaration, bc.name)
 		self.assertEqual(pr.custom_bc_doc_type, "BC 2.3")
-		self.assertEqual(pr.custom_bc_no_aju, "000023-012345-20261026-000001")
+		self.assertEqual(pr.custom_bc_no_aju, bc.no_aju)
 		self.assertEqual(pr.custom_bc_no_daftar, "001234")
 		self.assertTrue(len(pr.items) > 0)
 
@@ -104,3 +104,20 @@ class TestBC_23_Declaration(FrappeTestCase):
 		bc.cancel()
 		bc.delete()
 		frappe.form_dict = frappe._dict()
+
+	def test_generate_nomor_aju(self):
+		from bea_cukai_integration.api.bc_23 import generate_nomor_aju
+
+		# Test dengan tanda hubung
+		no_aju_hyphen = generate_nomor_aju("BC 2.3", tgl_aju="2026-10-26", with_hyphen=True)
+		parts = no_aju_hyphen.split("-")
+		self.assertEqual(len(parts), 4)
+		self.assertEqual(parts[0], "040323")  # kantor 0403 + doc 23
+		self.assertEqual(parts[1], "000001")  # perusahaan
+		self.assertEqual(parts[2], "20261026")  # tanggal
+		self.assertEqual(len(parts[3]), 6)  # nomor urut
+
+		# Test tanpa tanda hubung (persis 26 karakter)
+		no_aju_raw = generate_nomor_aju("BC 2.3", tgl_aju="2026-10-26", with_hyphen=False)
+		self.assertEqual(len(no_aju_raw), 26)
+		self.assertTrue(no_aju_raw.startswith("04032300000120261026"))
