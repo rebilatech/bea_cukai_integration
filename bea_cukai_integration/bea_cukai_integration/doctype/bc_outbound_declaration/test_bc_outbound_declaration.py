@@ -189,3 +189,100 @@ class TestBCOutboundDeclaration(FrappeTestCase):
 		fg_out_bc.delete()
 		raw_in_bc.cancel()
 		raw_in_bc.delete()
+	def test_customs_document_pairing_matrix(self):
+		from bea_cukai_integration.api.bc_23 import make_bc_inbound_from_po
+
+		po = frappe.get_all(
+			"Purchase Order",
+			filters={"docstatus": 1, "status": ["in", ["To Receive and Bill", "To Receive"]]},
+			order_by="creation asc",
+			limit=1,
+		)
+		if not po:
+			self.skipTest("Tidak ada PO untuk diuji")
+
+		po_name = po[0].name
+
+		# 1. Dokumen Masuk BC 2.3 (Impor)
+		bc23_in = make_bc_inbound_from_po(po_name, doc_type="BC 2.3")
+		bc23_in.insert()
+		bc23_in.submit()
+
+		# 2. Dokumen Masuk BC 4.0 (Lokal)
+		bc40_in = make_bc_inbound_from_po(po_name, doc_type="BC 4.0")
+		bc40_in.no_faktur_pajak = "070.000-26.00000099"
+		bc40_in.insert()
+		bc40_in.submit()
+
+		test_item = bc23_in.detail_item[0].item_code
+
+		# ATURAN 1: BC 2.3 in -> BC 3.0 export (VALID)
+		out_bc30 = frappe.new_doc("BC_Outbound_Declaration")
+		out_bc30.doc_type = "BC 3.0"
+		out_bc30.tgl_aju = "2026-10-26"
+		out_bc30.append("items", {
+			"item_code": test_item,
+			"qty": 1,
+			"rate": 100,
+			"inbound_bc_declaration": bc23_in.name,
+			"inbound_bc_type": "BC 2.3",
+		})
+		out_bc30.insert()
+		out_bc30.validate_inbound_history()
+
+		# ATURAN 2: BC 2.3 in -> BC 2.5 scrap/lokal (VALID)
+		out_bc25 = frappe.new_doc("BC_Outbound_Declaration")
+		out_bc25.doc_type = "BC 2.5"
+		out_bc25.tgl_aju = "2026-10-26"
+		out_bc25.append("items", {
+			"item_code": test_item,
+			"qty": 1,
+			"rate": 100,
+			"inbound_bc_declaration": bc23_in.name,
+			"inbound_bc_type": "BC 2.3",
+		})
+		out_bc25.insert()
+		out_bc25.validate_inbound_history()
+
+		# ATURAN 3: BC 4.0 in -> BC 4.1 (VALID)
+		out_bc41 = frappe.new_doc("BC_Outbound_Declaration")
+		out_bc41.doc_type = "BC 4.1"
+		out_bc41.tgl_aju = "2026-10-26"
+		out_bc41.append("items", {
+			"item_code": test_item,
+			"qty": 1,
+			"rate": 100,
+			"inbound_bc_declaration": bc40_in.name,
+			"inbound_bc_type": "BC 4.0",
+		})
+		out_bc41.insert()
+		out_bc41.validate_inbound_history()
+
+		# ATURAN 4: CROSS-CONTAMINATION REJECTION:
+		# Coba pasangkan BC 4.1 dengan BC 2.3 impor -> HARUS DITOLAK
+		mismatched_bc = frappe.new_doc("BC_Outbound_Declaration")
+		mismatched_bc.doc_type = "BC 4.1"
+		mismatched_bc.tgl_aju = "2026-10-26"
+		mismatched_bc.append("items", {
+			"item_code": test_item,
+			"qty": 1,
+			"rate": 100,
+			"inbound_bc_declaration": bc23_in.name,
+			"inbound_bc_type": "BC 2.3",
+		})
+		self.assertRaises(frappe.ValidationError, mismatched_bc.insert)
+
+		# ATURAN 5: BC 2.6.2 WAJIB ada Ex BC 2.6.1 asal
+		bc262_in = make_bc_inbound_from_po(po_name, doc_type="BC 2.6.2")
+		bc262_in.ref_bc_asal = None
+		bc262_in.docstatus = 1
+		self.assertRaises(frappe.ValidationError, bc262_in.validate_ex_bc_261)
+
+		# Cleanup
+		out_bc41.delete()
+		out_bc25.delete()
+		out_bc30.delete()
+		bc40_in.cancel()
+		bc40_in.delete()
+		bc23_in.cancel()
+		bc23_in.delete()

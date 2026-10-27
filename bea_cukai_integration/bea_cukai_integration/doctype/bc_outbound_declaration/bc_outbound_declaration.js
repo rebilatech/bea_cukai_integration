@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("BC_Outbound_Declaration", {
 	refresh(frm) {
+		frm.trigger("render_matrix_guidance");
 		frm.trigger("render_no_aju_status");
 
 		if (frm.doc.docstatus === 1) {
@@ -107,6 +108,7 @@ frappe.ui.form.on("BC_Outbound_Declaration", {
 	},
 
 	doc_type(frm) {
+		frm.trigger("render_matrix_guidance");
 		if (frm.doc.docstatus === 0) {
 			frappe.call({
 				method: "bea_cukai_integration.api.bc_outbound.assemble_outbound_nomor_aju",
@@ -192,6 +194,18 @@ frappe.ui.form.on("BC_Outbound_Declaration", {
 			},
 		});
 	},
+
+	render_matrix_guidance(frm) {
+		const descriptions = {
+			"BC 3.0": "BC 3.0 (Ekspor): Wajib menggunakan dokumen pemasukan BC 2.3 (Impor).",
+			"BC 2.5": "BC 2.5 (Scrap / Jual Lokal): Wajib menggunakan dokumen pemasukan BC 2.3 (Impor).",
+			"BC 4.1": "BC 4.1 (Hasil Olahan Lokal): Wajib menggunakan dokumen pemasukan BC 4.0 (Pemasukan Lokal).",
+			"BC 2.7 Keluar": "BC 2.7 Keluar: Wajib menggunakan dokumen pemasukan BC 2.7 (Antar TPB).",
+			"BC 2.6.1": "BC 2.6.1 (Keluar Perbaikan Non-KB): Barang sementara ke luar KB (kembali via BC 2.6.2).",
+		};
+		const desc = descriptions[frm.doc.doc_type] || "";
+		frm.set_df_property("doc_type", "description", `<span style="color: #17a2b8; font-weight: bold;">Aturan Pabean:</span> ${desc}`);
+	},
 });
 
 frappe.ui.form.on("BC_Outbound_Item", {
@@ -200,7 +214,10 @@ frappe.ui.form.on("BC_Outbound_Item", {
 		if (row.item_code && !row.inbound_bc_declaration) {
 			frappe.call({
 				method: "bea_cukai_integration.api.bc_outbound.get_inbound_history_for_item",
-				args: { item_code: row.item_code },
+				args: {
+					item_code: row.item_code,
+					outbound_doc_type: frm.doc.doc_type,
+				},
 				callback: function (r) {
 					if (r.message && r.message.length > 0) {
 						const latest = r.message[0];
@@ -215,7 +232,7 @@ frappe.ui.form.on("BC_Outbound_Item", {
 						frappe.model.set_value(cdt, cdn, "inbound_currency", latest.currency);
 						frappe.model.set_value(cdt, cdn, "inbound_cif_amount", latest.cif_amount);
 						frappe.show_alert({
-							message: __("Riwayat dokumen masuk otomatis dilekatkan untuk {0}", [row.item_code]),
+							message: __("Riwayat dokumen masuk {0} sesuai matriks berhasil dilekatkan", [latest.doc_type]),
 							indicator: "green",
 						});
 					}
@@ -234,6 +251,7 @@ frappe.ui.form.on("BC_Outbound_Item", {
 		frm.trigger("calculate_totals");
 	},
 });
+
 
 function show_outbound_no_aju_dialog(frm) {
 	if (!frm.doc.no_aju) {

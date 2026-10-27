@@ -12,6 +12,19 @@ OUTBOUND_DOC_TYPE_CODE_MAP = {
 	"BC 4.1": "41",
 }
 
+# Matriks Resmi Pasangan Dokumen Pengeluaran -> Dokumen Masuk yang Diizinkan:
+# - BC 2.3 in -> keluarnya BC 2.5 (scrap/lokal) atau BC 3.0 (export)
+# - BC 4.0 in -> keluarnya BC 4.1
+# - BC 2.7 in antar KB -> keluarnya BC 2.7 out antar KB
+# - BC 2.6.1 keluar diperbaiki non KB
+INBOUND_MATCH_MATRIX = {
+	"BC 3.0": ["BC 2.3"],
+	"BC 2.5": ["BC 2.3"],
+	"BC 4.1": ["BC 4.0"],
+	"BC 2.7 Keluar": ["BC 2.7"],
+	"BC 2.6.1": ["BC 2.3", "BC 4.0", "BC 2.7", "BC 2.6.2"],
+}
+
 
 @frappe.whitelist()
 def assemble_outbound_nomor_aju(doc_type="BC 3.0", tgl_aju=None, no_urut=None, with_hyphen=None):
@@ -52,15 +65,17 @@ def assemble_outbound_nomor_aju(doc_type="BC 3.0", tgl_aju=None, no_urut=None, w
 
 
 @frappe.whitelist()
-def get_inbound_history_for_item(item_code):
+def get_inbound_history_for_item(item_code, outbound_doc_type=None):
 	"""
-	Mencari riwayat dokumen pemasukan pabean untuk suatu item.
-	Menelusuri dari BC_23_Declaration dan Purchase Receipt Item.
-	Mengembalikan list riwayat pemasukan beserta No PO, No BC, Tanggal, dan Harga Perolehan.
+	Mencari riwayat dokumen pemasukan pabean untuk suatu item dengan filter matriks pabean:
+	- Jika untuk BC 3.0 / BC 2.5: hanya mencari pemasukan BC 2.3
+	- Jika untuk BC 4.1: hanya mencari pemasukan BC 4.0
+	- Jika untuk BC 2.7 Keluar: hanya mencari pemasukan BC 2.7
 	"""
 	if not item_code:
 		return []
 
+	allowed_inbounds = INBOUND_MATCH_MATRIX.get(outbound_doc_type) if outbound_doc_type else None
 	results = []
 
 	# 1. Cari dari detail item BC_23_Declaration yang telah submitted atau disimpan
@@ -80,11 +95,14 @@ def get_inbound_history_for_item(item_code):
 			b.supplier_name
 		FROM `tabBC_23_Declaration` b
 		INNER JOIN `tabPurchase Order Item` i ON i.parent = b.name AND i.parenttype = 'BC_23_Declaration'
-		WHERE i.item_code = %s
+		WHERE i.item_code = %(item_code)s
+		{doc_filter}
 		ORDER BY b.creation DESC
 		LIMIT 10
-		""",
-		(item_code,),
+		""".format(
+			doc_filter="AND b.doc_type IN %(allowed)s" if allowed_inbounds else ""
+		),
+		{"item_code": item_code, "allowed": tuple(allowed_inbounds) if allowed_inbounds else ()},
 		as_dict=True,
 	)
 
@@ -121,13 +139,16 @@ def get_inbound_history_for_item(item_code):
 				pr.supplier_name
 			FROM `tabPurchase Receipt Item` pri
 			INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
-			WHERE pri.item_code = %s AND pr.docstatus = 1 AND pr.custom_bc_declaration IS NOT NULL
+			WHERE pri.item_code = %(item_code)s AND pr.docstatus = 1 AND pr.custom_bc_declaration IS NOT NULL
+			{doc_filter}
 			ORDER BY pr.creation DESC
 			LIMIT 10
-			""",
-			(item_code,),
-			as_dict=True,
-		)
+			""".format(
+				doc_filter="AND pr.custom_bc_doc_type IN %(allowed)s" if allowed_inbounds else ""
+			),
+			{"item_code": item_code, "allowed": tuple(allowed_inbounds) if allowed_inbounds else ()},
+		as_dict=True,
+	)
 
 		for row in pr_items:
 			results.append({
@@ -178,7 +199,7 @@ def make_bc_outbound_from_sales_order(source_name, doc_type="BC 3.0", target_doc
 		total_out += row_amount
 
 		# Cari riwayat dokumen masuk untuk item ini
-		inbound_list = get_inbound_history_for_item(item.item_code)
+		inbound_list = get_inbound_history_for_item(item.item_code, outbound_doc_type=doc_type)
 		latest_inbound = inbound_list[0] if inbound_list else {}
 
 		hs_code = frappe.db.get_value("Item", item.item_code, "custom_hs_code") or ""
@@ -236,7 +257,7 @@ def make_bc_outbound_from_delivery_note(source_name, doc_type="BC 3.0", target_d
 		row_amount = flt(item.amount) or (qty_out * flt(item.rate))
 		total_out += row_amount
 
-		inbound_list = get_inbound_history_for_item(item.item_code)
+		inbound_list = get_inbound_history_for_item(item.item_code, outbound_doc_type=doc_type)
 		latest_inbound = inbound_list[0] if inbound_list else {}
 		hs_code = frappe.db.get_value("Item", item.item_code, "custom_hs_code") or ""
 
@@ -335,12 +356,11 @@ def api_create_outbound_bc():
 		inbound_rate = flt(item_dict.get("inbound_item_rate") or 0)
 
 		if not inbound_ref:
-			inbound_hist = get_inbound_history_for_item(item_code)
+			inbound_hist = get_inbound_history_for_item(item_code, outbound_doc_type=doc_type)
 			if inbound_hist:
 				inbound_ref = inbound_hist[0].get("bc_declaration")
 				inbound_po = inbound_hist[0].get("po_reference")
 				inbound_rate = inbound_hist[0].get("rate")
-
 		hs_code = item_dict.get("hs_code") or (frappe.db.get_value("Item", item_code, "custom_hs_code") or "")
 
 		bc.append("items", {
@@ -442,7 +462,7 @@ def explode_bom_for_outbound(bc_name):
 
 			for b_item in bom.items:
 				qty_consumed = flt(b_item.qty) * ratio
-				inbound_list = get_inbound_history_for_item(b_item.item_code)
+				inbound_list = get_inbound_history_for_item(b_item.item_code, outbound_doc_type=bc.doc_type)
 				latest_inbound = inbound_list[0] if inbound_list else {}
 				hs_code = frappe.db.get_value("Item", b_item.item_code, "custom_hs_code") or ""
 
