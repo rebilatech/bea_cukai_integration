@@ -21,6 +21,12 @@
   "freight",
   "bruto",
   "currency",
+  "section_dokumen_khusus",
+  "no_faktur_pajak",
+  "tgl_faktur_pajak",
+  "tpb_asal",
+  "ref_bc_asal",
+  "tgl_bc_asal",
   "detail_section",
   "cif_value",
   "bm",
@@ -173,6 +179,46 @@
    "label": "Detail item",
    "options": "Purchase Order Item",
    "reqd": 1
+  }
+,
+  {
+   "depends_on": "eval:doc.doc_type=='BC 4.0' || doc.doc_type=='BC 2.7' || doc.doc_type=='BC 2.6.2'",
+   "fieldname": "section_dokumen_khusus",
+   "fieldtype": "Section Break",
+   "label": "Informasi Khusus Dokumen Pabean"
+  },
+  {
+   "depends_on": "eval:doc.doc_type=='BC 4.0'",
+   "description": "Faktur Pajak pemasukan lokal (BC 4.0)",
+   "fieldname": "no_faktur_pajak",
+   "fieldtype": "Data",
+   "label": "Nomor Faktur Pajak"
+  },
+  {
+   "depends_on": "eval:doc.doc_type=='BC 4.0'",
+   "fieldname": "tgl_faktur_pajak",
+   "fieldtype": "Date",
+   "label": "Tanggal Faktur Pajak"
+  },
+  {
+   "depends_on": "eval:doc.doc_type=='BC 2.7'",
+   "description": "Nama / NPWP TPB atau Kawasan Berikat pengirim asal",
+   "fieldname": "tpb_asal",
+   "fieldtype": "Data",
+   "label": "Kawasan Berikat / TPB Asal"
+  },
+  {
+   "depends_on": "eval:doc.doc_type=='BC 2.6.2'",
+   "description": "Nomor Aju atau Nomor Pendaftaran BC 2.6.1 saat barang keluar untuk perbaikan",
+   "fieldname": "ref_bc_asal",
+   "fieldtype": "Data",
+   "label": "No Aju / No Daftar BC 2.6.1 Asal"
+  },
+  {
+   "depends_on": "eval:doc.doc_type=='BC 2.6.2'",
+   "fieldname": "tgl_bc_asal",
+   "fieldtype": "Date",
+   "label": "Tanggal BC 2.6.1 Asal"
   }
  ],
  "grid_page_length": 50,

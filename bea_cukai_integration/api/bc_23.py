@@ -150,17 +150,25 @@ def parse_and_validate_no_aju(no_aju):
 		"tracking_url": f"https://www.beacukai.go.id/tracking?noaju={clean_no}",
 	}
 @frappe.whitelist()
-def make_bc_23_from_po(source_name, target_doc=None):
+def make_bc_inbound_from_po(source_name, doc_type="BC 2.3", target_doc=None):
 	"""
-	Dipanggil dari Purchase Order untuk membuat draft BC_23_Declaration di UI
+	Membuat draft dokumen pabean pemasukan dari Purchase Order di UI:
+	- BC 2.3 (Impor)
+	- BC 4.0 (Pemasukan Lokal TLDDP)
+	- BC 2.7 (Pemasukan Antar TPB/KB)
+	- BC 2.6.2 (Pemasukan Kembali setelah Perbaikan/Subkontrak)
 	"""
 	po = frappe.get_doc("Purchase Order", source_name)
 	if po.docstatus != 1:
 		frappe.throw(_("Purchase Order {0} harus dalam status Submitted").format(source_name))
 
+	valid_types = ["BC 2.3", "BC 4.0", "BC 2.7", "BC 2.6.2"]
+	if doc_type not in valid_types:
+		frappe.throw(_("Jenis dokumen {0} tidak valid. Pilihan: {1}").format(doc_type, ", ".join(valid_types)))
+
 	bc = frappe.new_doc("BC_23_Declaration")
 	bc.erp_bc_reference = po.name
-	bc.doc_type = "BC 2.3"
+	bc.doc_type = doc_type
 	bc.tgl_aju = nowdate()
 	settings = frappe.get_single("Bea Cukai Settings")
 	if settings.auto_generate_no_aju:
@@ -210,6 +218,10 @@ def make_bc_23_from_po(source_name, target_doc=None):
 	bc.cif_value = total_cif
 	return bc
 
+
+@frappe.whitelist()
+def make_bc_23_from_po(source_name, target_doc=None):
+	return make_bc_inbound_from_po(source_name, doc_type="BC 2.3", target_doc=target_doc)
 
 @frappe.whitelist()
 def make_purchase_receipt_from_bc(source_name, target_doc=None):
@@ -262,10 +274,13 @@ def make_purchase_receipt_from_bc(source_name, target_doc=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def api_create_bc_23():
+def api_create_inbound_bc():
 	"""
-	REST API Endpoint: POST /api/method/bea_cukai_integration.api.bc_23.api_create_bc_23
-	Menerima data JSON untuk membuat dokumen BC 2.3 dari Purchase Order.
+	REST API Endpoint terpadu untuk semua dokumen pemasukan pabean:
+	- BC 2.3 (Impor)
+	- BC 4.0 (Pemasukan Lokal TLDDP)
+	- BC 2.7 (Pemasukan Antar TPB/KB)
+	- BC 2.6.2 (Pemasukan Kembali Perbaikan/Subkontrak)
 	"""
 	data = frappe.request.get_json() if frappe.request and frappe.request.data else frappe.form_dict
 	if isinstance(data, str):
@@ -279,10 +294,19 @@ def api_create_bc_23():
 	if po.docstatus != 1:
 		frappe.throw(_("Purchase Order {0} belum di-submit").format(po_name))
 
+	doc_type = data.get("doc_type", "BC 2.3")
 	bc = frappe.new_doc("BC_23_Declaration")
 	bc.erp_bc_reference = po.name
-	bc.doc_type = data.get("doc_type", "BC 2.3")
+	bc.doc_type = doc_type
 	bc.tgl_aju = data.get("tgl_aju") or nowdate()
+
+	# Field spesifik per jenis dokumen
+	bc.no_faktur_pajak = data.get("no_faktur_pajak")
+	bc.tgl_faktur_pajak = data.get("tgl_faktur_pajak")
+	bc.tpb_asal = data.get("tpb_asal")
+	bc.ref_bc_asal = data.get("ref_bc_asal")
+	bc.tgl_bc_asal = data.get("tgl_bc_asal")
+
 	settings = frappe.get_single("Bea Cukai Settings")
 	if data.get("no_urut"):
 		bc.no_urut = str(data.get("no_urut"))
@@ -396,15 +420,45 @@ def api_create_bc_23():
 
 	return {
 		"status": "success",
-		"message": _("BC 2.3 Declaration {0} berhasil dibuat").format(bc.name),
+		"message": _("{0} Declaration {1} berhasil dibuat").format(bc.doc_type, bc.name),
 		"data": {
 			"name": bc.name,
+			"doc_type": bc.doc_type,
 			"docstatus": bc.docstatus,
 			"no_aju": bc.no_aju,
+			"no_urut": bc.no_urut,
 			"erp_bc_reference": bc.erp_bc_reference,
 			"cif_value": bc.cif_value,
 		}
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def api_create_bc_23():
+	"""REST API Endpoint khusus BC 2.3 (Pemasukan Impor)"""
+	frappe.form_dict.setdefault("doc_type", "BC 2.3")
+	return api_create_inbound_bc()
+
+
+@frappe.whitelist(methods=["POST"])
+def api_create_bc_40():
+	"""REST API Endpoint khusus BC 4.0 (Pemasukan Lokal TLDDP)"""
+	frappe.form_dict["doc_type"] = "BC 4.0"
+	return api_create_inbound_bc()
+
+
+@frappe.whitelist(methods=["POST"])
+def api_create_bc_27():
+	"""REST API Endpoint khusus BC 2.7 (Pemasukan Antar TPB / Kawasan Berikat)"""
+	frappe.form_dict["doc_type"] = "BC 2.7"
+	return api_create_inbound_bc()
+
+
+@frappe.whitelist(methods=["POST"])
+def api_create_bc_262():
+	"""REST API Endpoint khusus BC 2.6.2 (Pemasukan Kembali setelah Perbaikan/Subkontrak)"""
+	frappe.form_dict["doc_type"] = "BC 2.6.2"
+	return api_create_inbound_bc()
 
 
 @frappe.whitelist(methods=["POST"])
@@ -444,10 +498,23 @@ def api_make_purchase_receipt():
 @frappe.whitelist()
 def generate_ceisa_payload(bc_name):
 	"""
-	Menghasilkan format JSON CEISA 4.0 Bea Cukai untuk dokumen BC 2.3
+	Menghasilkan format JSON CEISA 4.0 Bea Cukai untuk semua dokumen pemasukan:
+	- BC 2.3: kodeDokumen 23 (Impor)
+	- BC 4.0: kodeDokumen 40 (Lokal TLDDP)
+	- BC 2.7: kodeDokumen 27 (Antar TPB)
+	- BC 2.6.2: kodeDokumen 262 (Kembali Perbaikan)
 	"""
 	bc = frappe.get_doc("BC_23_Declaration", bc_name) if isinstance(bc_name, str) else bc_name
 	po = frappe.get_doc("Purchase Order", bc.erp_bc_reference) if bc.erp_bc_reference else None
+	settings = frappe.get_single("Bea Cukai Settings")
+
+	ceisa_doc_code = "23"
+	if bc.doc_type == "BC 4.0":
+		ceisa_doc_code = "40"
+	elif bc.doc_type == "BC 2.7":
+		ceisa_doc_code = "27"
+	elif bc.doc_type == "BC 2.6.2":
+		ceisa_doc_code = "262"
 
 	barang_list = []
 	for idx, item in enumerate(bc.detail_item, start=1):
@@ -463,37 +530,50 @@ def generate_ceisa_payload(bc_name):
 			"cif": flt(item.amount),
 		})
 
+	dokumen_tambahan = []
+	if bc.doc_type == "BC 4.0" and bc.no_faktur_pajak:
+		dokumen_tambahan.append({
+			"kodeDokumen": "380",  # Faktur Pajak
+			"nomorDokumen": bc.no_faktur_pajak,
+			"tanggalDokumen": str(bc.tgl_faktur_pajak or bc.tgl_aju),
+		})
+	elif bc.doc_type == "BC 2.6.2" and bc.ref_bc_asal:
+		dokumen_tambahan.append({
+			"kodeDokumen": "261",  # BC 2.6.1 Asal
+			"nomorDokumen": bc.ref_bc_asal,
+			"tanggalDokumen": str(bc.tgl_bc_asal or bc.tgl_aju),
+		})
+
+	entitas_list = [
+		{
+			"kodeEntitas": "1",  # Pengusaha TPB / Penerima
+			"namaEntitas": po.company if po else (settings.nama_perusahaan or ""),
+			"nomorIdentitas": settings.npwp_perusahaan or "",
+		},
+		{
+			"kodeEntitas": "2",  # Pengirim / Pemasok
+			"namaEntitas": bc.tpb_asal if (bc.doc_type == "BC 2.7" and bc.tpb_asal) else (bc.supplier_name or ""),
+		}
+	]
+
 	payload = {
 		"nomorAju": bc.no_aju or "",
 		"tanggalAju": str(bc.tgl_aju or ""),
-		"kodeDokumen": "23",
-		"kodeKantor": "040300",  # Default KPPBC
-		"entitas": [
-			{
-				"kodeEntitas": "1",  # Importir / Pengusaha TPB
-				"namaEntitas": po.company if po else "",
-			},
-			{
-				"kodeEntitas": "2",  # Pemasok Luar Negeri
-				"namaEntitas": bc.supplier_name or "",
-			}
-		],
-		"pengangkut": {
-			"kodeTutupPu": "11",
-		},
+		"kodeDokumen": ceisa_doc_code,
+		"kodeKantor": settings.kode_kantor or "0403",
+		"entitas": entitas_list,
 		"pungutan": {
 			"nilaiCif": flt(bc.cif_value),
 			"beaMasuk": flt(bc.bm),
 			"ppn": flt(bc.ppn),
 			"ppnBm": flt(bc.ppn_bm),
 		},
+		"dokumen": dokumen_tambahan,
 		"barang": barang_list,
 	}
 
 	bc.json_payload = json.dumps(payload, indent=2)
 	bc.save(ignore_permissions=True)
-	frappe.db.commit()
-
 	return payload
 
 

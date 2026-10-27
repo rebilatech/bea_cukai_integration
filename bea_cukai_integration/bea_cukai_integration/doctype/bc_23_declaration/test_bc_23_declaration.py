@@ -201,3 +201,73 @@ class TestBC_23_Declaration(FrappeTestCase):
 		validate_purchase_receipt_bc_requirement(pr_bc_blocked)
 		# Cleanup state item
 		frappe.db.set_value("Item", test_item_code, "custom_is_bc", 0)
+
+	def test_all_inbound_documents(self):
+		from bea_cukai_integration.api.bc_23 import (
+			make_bc_inbound_from_po,
+			make_purchase_receipt_from_bc,
+			generate_ceisa_payload,
+		)
+
+		po = frappe.get_all(
+			"Purchase Order",
+			filters={"docstatus": 1, "status": ["in", ["To Receive and Bill", "To Receive"]]},
+			order_by="creation asc",
+			limit=1,
+		)
+		if not po:
+			self.skipTest("Tidak ada PO untuk diuji")
+
+		po_name = po[0].name
+
+		# 1. Test BC 4.0 (Pemasukan Lokal TLDDP)
+		bc40 = make_bc_inbound_from_po(po_name, doc_type="BC 4.0")
+		self.assertEqual(bc40.doc_type, "BC 4.0")
+		self.assertTrue("40-" in bc40.no_aju or "40" in bc40.no_aju)
+		bc40.no_faktur_pajak = "070.000-26.00000001"
+		bc40.tgl_faktur_pajak = "2026-10-26"
+		bc40.insert()
+		payload40 = generate_ceisa_payload(bc40.name)
+		self.assertEqual(payload40["kodeDokumen"], "40")
+		self.assertEqual(payload40["dokumen"][0]["kodeDokumen"], "380")
+		self.assertEqual(payload40["dokumen"][0]["nomorDokumen"], "070.000-26.00000001")
+		bc40.reload()
+		bc40.submit()
+		pr40 = make_purchase_receipt_from_bc(bc40.name)
+		self.assertEqual(pr40.custom_bc_doc_type, "BC 4.0")
+		bc40.cancel()
+		bc40.delete()
+
+		# 2. Test BC 2.7 (Pemasukan Antar TPB/KB)
+		bc27 = make_bc_inbound_from_po(po_name, doc_type="BC 2.7")
+		self.assertEqual(bc27.doc_type, "BC 2.7")
+		self.assertTrue("27-" in bc27.no_aju or "27" in bc27.no_aju)
+		bc27.tpb_asal = "PT Kawasan Berikat Mitra Sejahtera"
+		bc27.insert()
+		payload27 = generate_ceisa_payload(bc27.name)
+		self.assertEqual(payload27["kodeDokumen"], "27")
+		self.assertEqual(payload27["entitas"][1]["namaEntitas"], "PT Kawasan Berikat Mitra Sejahtera")
+		bc27.reload()
+		bc27.submit()
+		pr27 = make_purchase_receipt_from_bc(bc27.name)
+		self.assertEqual(pr27.custom_bc_doc_type, "BC 2.7")
+		bc27.cancel()
+		bc27.delete()
+
+		# 3. Test BC 2.6.2 (Pemasukan Kembali setelah Perbaikan)
+		bc262 = make_bc_inbound_from_po(po_name, doc_type="BC 2.6.2")
+		self.assertEqual(bc262.doc_type, "BC 2.6.2")
+		self.assertTrue("26-" in bc262.no_aju or "26" in bc262.no_aju)
+		bc262.ref_bc_asal = "040326-000001-20261001-000010"
+		bc262.tgl_bc_asal = "2026-10-01"
+		bc262.insert()
+		payload262 = generate_ceisa_payload(bc262.name)
+		self.assertEqual(payload262["kodeDokumen"], "262")
+		self.assertEqual(payload262["dokumen"][0]["kodeDokumen"], "261")
+		self.assertEqual(payload262["dokumen"][0]["nomorDokumen"], "040326-000001-20261001-000010")
+		bc262.reload()
+		bc262.submit()
+		pr262 = make_purchase_receipt_from_bc(bc262.name)
+		self.assertEqual(pr262.custom_bc_doc_type, "BC 2.6.2")
+		bc262.cancel()
+		bc262.delete()
