@@ -41,7 +41,7 @@ frappe.ui.form.on("BC_23_Declaration", {
 			);
 		}
 
-		// Tombol pemeriksaan nomor aju (selalu tersedia)
+		// Tombol pemeriksaan rincian nomor aju
 		frm.add_custom_button(
 			__("Cek Rincian No Aju"),
 			function () {
@@ -52,19 +52,21 @@ frappe.ui.form.on("BC_23_Declaration", {
 
 		if (frm.doc.docstatus === 0) {
 			frm.add_custom_button(
-				__("Generate Ulang No Aju"),
+				__("Generate No Urut Baru"),
 				function () {
 					frappe.call({
-						method: "bea_cukai_integration.api.bc_23.generate_nomor_aju",
+						method: "bea_cukai_integration.api.bc_23.assemble_nomor_aju",
 						args: {
 							doc_type: frm.doc.doc_type || "BC 2.3",
 							tgl_aju: frm.doc.tgl_aju,
+							no_urut: null, // Minta sequence nomor urut baru dari sistem
 						},
 						callback: function (r) {
 							if (r.message) {
-								frm.set_value("no_aju", r.message);
+								frm.set_value("no_urut", r.message.no_urut);
+								frm.set_value("no_aju", r.message.no_aju);
 								frappe.show_alert({
-									message: __("Nomor Aju 26 digit berhasil digenerate"),
+									message: __("Nomor Urut baru berhasil digenerate"),
 									indicator: "blue",
 								});
 								frm.trigger("render_no_aju_status");
@@ -77,8 +79,42 @@ frappe.ui.form.on("BC_23_Declaration", {
 		}
 	},
 
-	no_aju(frm) {
-		frm.trigger("render_no_aju_status");
+	no_urut(frm) {
+		if (frm.doc.docstatus === 0 && frm.doc.no_urut) {
+			frm.trigger("recalculate_no_aju");
+		}
+	},
+
+	doc_type(frm) {
+		if (frm.doc.docstatus === 0) {
+			frm.trigger("recalculate_no_aju");
+		}
+	},
+
+	tgl_aju(frm) {
+		if (frm.doc.docstatus === 0) {
+			frm.trigger("recalculate_no_aju");
+		}
+	},
+
+	recalculate_no_aju(frm) {
+		frappe.call({
+			method: "bea_cukai_integration.api.bc_23.assemble_nomor_aju",
+			args: {
+				doc_type: frm.doc.doc_type || "BC 2.3",
+				tgl_aju: frm.doc.tgl_aju,
+				no_urut: frm.doc.no_urut,
+			},
+			callback: function (r) {
+				if (r.message) {
+					if (frm.doc.no_urut !== r.message.no_urut) {
+						frm.set_value("no_urut", r.message.no_urut);
+					}
+					frm.set_value("no_aju", r.message.no_aju);
+					frm.trigger("render_no_aju_status");
+				}
+			},
+		});
 	},
 
 	render_no_aju_status(frm) {
@@ -86,7 +122,7 @@ frappe.ui.form.on("BC_23_Declaration", {
 			frm.set_df_property(
 				"no_aju",
 				"description",
-				__("Nomor Aju 26 digit standar DJBC (otomatis terisi saat simpan atau tarik PO)")
+				__("Nomor Aju dirakit otomatis dari Kantor (Master) + Dokumen + Perusahaan (Master) + Tanggal + No Urut")
 			);
 			return;
 		}
@@ -125,7 +161,10 @@ frappe.ui.form.on("BC_23_Declaration", {
 				callback: function (r) {
 					if (r.message) {
 						const data = r.message;
-						if (!frm.doc.no_aju && data.no_aju) {
+						if (data.no_urut) {
+							frm.set_value("no_urut", data.no_urut);
+						}
+						if (data.no_aju) {
 							frm.set_value("no_aju", data.no_aju);
 						}
 						if (!frm.doc.supplier_name) {
@@ -174,12 +213,12 @@ function show_no_aju_dialog(frm) {
 					</div>
 					<table class="table table-bordered table-sm" style="font-size: 13px;">
 						<tbody>
-							<tr><th style="width: 40%;">Kode Kantor Pabean</th><td><b>${data.kode_kantor}</b> (${data.nama_kantor})</td></tr>
-							<tr><th>Jenis Dokumen Pabean</th><td><b>${data.kode_dokumen}</b> (${data.doc_type_name})</td></tr>
-							<tr><th>Kode Unik Perusahaan</th><td><b>${data.kode_perusahaan}</b></td></tr>
-							<tr><th>Tanggal Pengajuan</th><td><b>${data.tanggal_aju}</b> (format YYYYMMDD: ${data.tanggal_raw})</td></tr>
-							<tr><th>Nomor Urut Dokumen</th><td><b>${data.nomor_urut}</b></td></tr>
-							<tr><th>26 Digit Murni</th><td><code>${data.clean_no}</code></td></tr>
+							<tr><th style="width: 40%;">Kode Kantor Pabean (Master IT)</th><td><b>${data.kode_kantor}</b> (${data.nama_kantor})</td></tr>
+							<tr><th>Jenis Dokumen (Pilihan Form)</th><td><b>${data.kode_dokumen}</b> (${data.doc_type_name})</td></tr>
+							<tr><th>Kode Unik Perusahaan (Master IT)</th><td><b>${data.kode_perusahaan}</b></td></tr>
+							<tr><th>Tanggal Pengajuan (Pilihan Form)</th><td><b>${data.tanggal_aju}</b> (format YYYYMMDD: ${data.tanggal_raw})</td></tr>
+							<tr><th>Nomor Urut Pengajuan (Diedit User)</th><td><span class="badge badge-primary" style="font-size: 13px;">${data.nomor_urut}</span></td></tr>
+							<tr><th>26 Digit Murni Pabean</th><td><code>${data.clean_no}</code></td></tr>
 						</tbody>
 					</table>
 				`;

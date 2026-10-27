@@ -13,10 +13,14 @@ DOC_TYPE_CODE_MAP = {
 
 
 @frappe.whitelist()
-def generate_nomor_aju(doc_type="BC 2.3", tgl_aju=None, with_hyphen=None):
+def assemble_nomor_aju(doc_type="BC 2.3", tgl_aju=None, no_urut=None, with_hyphen=None):
 	"""
-	Menghasilkan 26 digit Nomor Aju pabean resmi (DJBC / CEISA 4.0):
-	Format: KKKK (4 digit Kantor) + DD (2 digit Dokumen) + EEEEEE (6 digit Perusahaan) + YYYYMMDD (8 digit Tanggal) + SSSSSS (6 digit Urut)
+	Merakit 26 digit Nomor Aju dari acuan:
+	1. kode_kantor (Master Bea Cukai Settings - hanya IT/Admin)
+	2. doc_type (Select Dokumen: BC 2.3 -> 23)
+	3. kode_perusahaan (Master Bea Cukai Settings - hanya IT/Admin)
+	4. tgl_aju (Date) -> YYYYMMDD
+	5. no_urut (6 digit yang dapat diedit oleh user)
 	"""
 	settings = frappe.get_single("Bea Cukai Settings")
 	kode_kantor = (settings.kode_kantor or "0403").strip()[:4].zfill(4)
@@ -28,19 +32,34 @@ def generate_nomor_aju(doc_type="BC 2.3", tgl_aju=None, with_hyphen=None):
 	date_obj = getdate(tgl_aju)
 	date_str = date_obj.strftime("%Y%m%d")
 
-	# Penomoran sekuensial harian atomik via tabSeries
-	series_key = f"NOAJU.{doc_code}.{date_str}..######"
-	raw_series = str(frappe.model.naming.make_autoname(series_key))
-	serial_no = raw_series[-6:].zfill(6)
+	if not no_urut:
+		series_key = f"NOAJU.{doc_code}.{date_str}..######"
+		raw_series = str(frappe.model.naming.make_autoname(series_key))
+		clean_urut = raw_series[-6:].zfill(6)
+	else:
+		digits_only = "".join(filter(str.isdigit, str(no_urut)))
+		clean_urut = digits_only[:6].zfill(6) if digits_only else "000001"
 
 	if with_hyphen is None:
 		with_hyphen = bool(settings.no_aju_with_hyphen)
 
 	if with_hyphen:
-		return f"{kode_kantor}{doc_code}-{kode_perusahaan}-{date_str}-{serial_no}"
+		no_aju = f"{kode_kantor}{doc_code}-{kode_perusahaan}-{date_str}-{clean_urut}"
 	else:
-		return f"{kode_kantor}{doc_code}{kode_perusahaan}{date_str}{serial_no}"
+		no_aju = f"{kode_kantor}{doc_code}{kode_perusahaan}{date_str}{clean_urut}"
 
+	return {
+		"no_urut": clean_urut,
+		"no_aju": no_aju,
+	}
+
+
+@frappe.whitelist()
+def generate_nomor_aju(doc_type="BC 2.3", tgl_aju=None, with_hyphen=None):
+	"""
+	Menghasilkan 26 digit Nomor Aju pabean resmi (DJBC / CEISA 4.0)
+	"""
+	return assemble_nomor_aju(doc_type=doc_type, tgl_aju=tgl_aju, no_urut=None, with_hyphen=with_hyphen)["no_aju"]
 
 @frappe.whitelist()
 def parse_and_validate_no_aju(no_aju):
@@ -124,8 +143,9 @@ def make_bc_23_from_po(source_name, target_doc=None):
 	bc.tgl_aju = nowdate()
 	settings = frappe.get_single("Bea Cukai Settings")
 	if settings.auto_generate_no_aju:
-		bc.no_aju = generate_nomor_aju(bc.doc_type, bc.tgl_aju)
-
+		assembled = assemble_nomor_aju(bc.doc_type, bc.tgl_aju)
+		bc.no_urut = assembled["no_urut"]
+		bc.no_aju = assembled["no_aju"]
 	bc.supplier_name = po.supplier_name or po.supplier
 	bc.currency = po.currency
 
@@ -234,14 +254,17 @@ def api_create_bc_23():
 	bc.erp_bc_reference = po.name
 	bc.doc_type = data.get("doc_type", "BC 2.3")
 	bc.tgl_aju = data.get("tgl_aju") or nowdate()
+	settings = frappe.get_single("Bea Cukai Settings")
+	if data.get("no_urut"):
+		bc.no_urut = str(data.get("no_urut"))
 	if data.get("no_aju"):
 		bc.no_aju = str(data.get("no_aju"))
+	elif settings.auto_generate_no_aju:
+		assembled = assemble_nomor_aju(bc.doc_type, bc.tgl_aju, bc.no_urut)
+		bc.no_urut = assembled["no_urut"]
+		bc.no_aju = assembled["no_aju"]
 	else:
-		settings = frappe.get_single("Bea Cukai Settings")
-		if settings.auto_generate_no_aju:
-			bc.no_aju = generate_nomor_aju(bc.doc_type, bc.tgl_aju)
-		else:
-			bc.no_aju = ""
+		bc.no_aju = ""
 	bc.no_daftar = data.get("no_daftar")
 	bc.tgl_daftar = data.get("tgl_daftar")
 	bc.supplier_name = data.get("supplier_name") or po.supplier_name or po.supplier

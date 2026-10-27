@@ -9,8 +9,9 @@
   "header_section",
   "doc_type",
   "erp_bc_reference",
-  "no_aju",
   "tgl_aju",
+  "no_urut",
+  "no_aju",
   "no_daftar",
   "tgl_daftar",
   "supplier_name",
@@ -87,14 +88,22 @@
    "options": "\u202fJSON"
   },
   {
-   "fieldname": "no_aju",
-   "fieldtype": "Data",
-   "label": "No Aju"
-  },
-  {
    "fieldname": "tgl_aju",
    "fieldtype": "Date",
    "label": "Tanggal Aju"
+  },
+  {
+   "description": "Nomor urut harian pengajuan yang dapat diedit oleh user (6 digit)",
+   "fieldname": "no_urut",
+   "fieldtype": "Data",
+   "label": "Nomor Urut Aju (6 Digit)"
+  },
+  {
+   "description": "Dirakit otomatis dari Kantor (Master) + Dokumen + Perusahaan (Master) + Tanggal + Nomor Urut",
+   "fieldname": "no_aju",
+   "fieldtype": "Data",
+   "label": "No Aju (26 Digit)",
+   "read_only": 1
   },
   {
    "fieldname": "no_daftar",

@@ -121,3 +121,16 @@ class TestBC_23_Declaration(FrappeTestCase):
 		no_aju_raw = generate_nomor_aju("BC 2.3", tgl_aju="2026-10-26", with_hyphen=False)
 		self.assertEqual(len(no_aju_raw), 26)
 		self.assertTrue(no_aju_raw.startswith("04032300000120261026"))
+
+	def test_custom_no_urut_reassembly(self):
+		from bea_cukai_integration.api.bc_23 import assemble_nomor_aju
+
+		# Test user memasukkan no_urut custom "42" (otomatis padding jadi 000042)
+		res = assemble_nomor_aju("BC 2.3", tgl_aju="2026-10-26", no_urut="42", with_hyphen=True)
+		self.assertEqual(res["no_urut"], "000042")
+		self.assertEqual(res["no_aju"], "040323-000001-20261026-000042")
+
+		# Test pergantian jenis dokumen ke BC 2.7 dengan no_urut "000123"
+		res2 = assemble_nomor_aju("BC 2.7", tgl_aju="2026-10-26", no_urut="000123", with_hyphen=True)
+		self.assertEqual(res2["no_urut"], "000123")
+		self.assertEqual(res2["no_aju"], "040327-000001-20261026-000123")

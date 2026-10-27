@@ -9,11 +9,12 @@ from frappe.utils import flt
 
 class BC_23_Declaration(Document):
 	def before_insert(self):
-		if not self.no_aju:
-			settings = frappe.get_single("Bea Cukai Settings")
-			if settings.auto_generate_no_aju:
-				from bea_cukai_integration.api.bc_23 import generate_nomor_aju
-				self.no_aju = generate_nomor_aju(self.doc_type or "BC 2.3", self.tgl_aju)
+		settings = frappe.get_single("Bea Cukai Settings")
+		if settings.auto_generate_no_aju:
+			from bea_cukai_integration.api.bc_23 import assemble_nomor_aju
+			assembled = assemble_nomor_aju(self.doc_type or "BC 2.3", self.tgl_aju, self.no_urut)
+			self.no_urut = assembled["no_urut"]
+			self.no_aju = assembled["no_aju"]
 
 	def validate(self):
 		self.validate_po_reference()
@@ -27,7 +28,13 @@ class BC_23_Declaration(Document):
 				frappe.throw(_("Purchase Order {0} tidak ditemukan").format(self.erp_bc_reference))
 
 	def validate_no_aju(self):
-		if self.no_aju:
+		settings = frappe.get_single("Bea Cukai Settings")
+		if settings.auto_generate_no_aju:
+			from bea_cukai_integration.api.bc_23 import assemble_nomor_aju
+			assembled = assemble_nomor_aju(self.doc_type or "BC 2.3", self.tgl_aju, self.no_urut)
+			self.no_urut = assembled["no_urut"]
+			self.no_aju = assembled["no_aju"]
+		elif self.no_aju:
 			from bea_cukai_integration.api.bc_23 import parse_and_validate_no_aju
 			res = parse_and_validate_no_aju(self.no_aju)
 			if not res["is_valid"]:
@@ -35,12 +42,6 @@ class BC_23_Declaration(Document):
 					frappe.throw(_("Nomor Aju tidak valid: {0}").format(res["message"]))
 				else:
 					frappe.msgprint(_("Peringatan: {0}").format(res["message"]), alert=True)
-			elif res.get("formatted"):
-				settings = frappe.get_single("Bea Cukai Settings")
-				if settings.no_aju_with_hyphen:
-					self.no_aju = res["formatted"]
-				else:
-					self.no_aju = res["clean_no"]
 	def calculate_totals(self):
 		total_amount = sum(flt(item.amount) for item in self.detail_item)
 		if not self.cif_value or self.cif_value == 0:
