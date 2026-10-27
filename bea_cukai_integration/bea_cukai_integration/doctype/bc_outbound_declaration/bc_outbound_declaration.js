@@ -40,6 +40,50 @@ frappe.ui.form.on("BC_Outbound_Declaration", {
 				},
 				__("Actions")
 			);
+
+			frm.add_custom_button(
+				__("Kirim ke CEISA 4.0"),
+				function () {
+					frappe.confirm(
+						__("Kirim dokumen pengeluaran {0} (No Aju: {1}) ke server Gateway CEISA 4.0?", [
+							frm.doc.name,
+							frm.doc.no_aju,
+						]),
+						function () {
+							frappe.call({
+								method: "bea_cukai_integration.api.ceisa_client.send_document_to_ceisa",
+								args: { doctype: frm.doc.doctype, docname: frm.doc.name },
+								freeze: true,
+								freeze_message: __("Mengirim data ke Gateway CEISA 4.0..."),
+								callback: function (r) {
+									if (r.message && r.message.status === "success") {
+										frm.reload_doc();
+									}
+								},
+							});
+						}
+					);
+				},
+				__("CEISA 4.0")
+			);
+
+			frm.add_custom_button(
+				__("Cek Status CEISA"),
+				function () {
+					frappe.call({
+						method: "bea_cukai_integration.api.ceisa_client.check_ceisa_status",
+						args: { doctype: frm.doc.doctype, docname: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Memeriksa status terkini dari CEISA 4.0..."),
+						callback: function (r) {
+							if (r.message) {
+								frm.reload_doc();
+							}
+						},
+					});
+				},
+				__("CEISA 4.0")
+			);
 		}
 
 		frm.add_custom_button(

@@ -271,3 +271,32 @@ class TestBC_23_Declaration(FrappeTestCase):
 		self.assertEqual(pr262.custom_bc_doc_type, "BC 2.6.2")
 		bc262.cancel()
 		bc262.delete()
+
+	def test_ceisa_client_connector(self):
+		from bea_cukai_integration.api.ceisa_client import get_ceisa_config, login_ceisa
+
+		config = get_ceisa_config()
+		self.assertTrue("https://" in config["base_url"])
+
+		# Uji validasi kredensial kosong
+		settings = frappe.get_single("Bea Cukai Settings")
+		old_user = settings.ceisa_username
+		settings.ceisa_username = None
+		settings.ceisa_access_token = None
+		settings.save()
+
+		self.assertRaises(frappe.ValidationError, login_ceisa, force=True)
+
+		# Uji penggunaan token aktif
+		settings.ceisa_access_token = "mock-active-jwt-token"
+		settings.ceisa_token_expiry = frappe.utils.add_to_date(frappe.utils.now_datetime(), hours=2)
+		settings.save()
+
+		res = login_ceisa(force=False)
+		self.assertEqual(res["status"], "success")
+		self.assertEqual(res["token"], "mock-active-jwt-token")
+
+		# Cleanup
+		settings.ceisa_username = old_user
+		settings.ceisa_access_token = None
+		settings.save()

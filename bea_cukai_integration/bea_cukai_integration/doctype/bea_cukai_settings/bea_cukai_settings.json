@@ -16,7 +16,18 @@
   "auto_generate_no_aju",
   "no_aju_with_hyphen",
   "col_break2",
-  "format_preview"
+  "format_preview",
+  "section_ceisa_server",
+  "ceisa_environment",
+  "ceisa_gateway_url",
+  "col_break_ceisa1",
+  "ceisa_username",
+  "ceisa_password",
+  "section_ceisa_status",
+  "ceisa_access_token",
+  "col_break_ceisa2",
+  "ceisa_last_status",
+  "ceisa_token_expiry"
  ],
  "fields": [
   {
@@ -88,6 +99,70 @@
    "fieldname": "format_preview",
    "fieldtype": "Small Text",
    "label": "Format Standar Pabean",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_ceisa_server",
+   "fieldtype": "Section Break",
+   "label": "Konfigurasi Server API CEISA 4.0"
+  },
+  {
+   "default": "Production",
+   "fieldname": "ceisa_environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "Production\nSandbox / Testing"
+  },
+  {
+   "default": "https://apis-gw.beacukai.go.id",
+   "description": "Base Gateway URL resmi DJBC: https://apis-gw.beacukai.go.id (atau URL Sandbox pengembang)",
+   "fieldname": "ceisa_gateway_url",
+   "fieldtype": "Data",
+   "label": "API Gateway Base URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_ceisa1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "User ID / Username akun perusahaan yang terdaftar di CEISA 4.0",
+   "fieldname": "ceisa_username",
+   "fieldtype": "Data",
+   "label": "CEISA Username"
+  },
+  {
+   "description": "Password login akun perusahaan di CEISA 4.0",
+   "fieldname": "ceisa_password",
+   "fieldtype": "Password",
+   "label": "CEISA Password"
+  },
+  {
+   "fieldname": "section_ceisa_status",
+   "fieldtype": "Section Break",
+   "label": "Status Koneksi & Token CEISA"
+  },
+  {
+   "description": "Token Bearer JWT yang didapatkan otomatis setelah berhasil login ke gateway DJBC",
+   "fieldname": "ceisa_access_token",
+   "fieldtype": "Small Text",
+   "label": "Access Token (JWT Bearer)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_ceisa2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ceisa_last_status",
+   "fieldtype": "Data",
+   "label": "Status Koneksi Terakhir",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ceisa_token_expiry",
+   "fieldtype": "Datetime",
+   "label": "Masa Berlaku Token",
    "read_only": 1
   }
  ],

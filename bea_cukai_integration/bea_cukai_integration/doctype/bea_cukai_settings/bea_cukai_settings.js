@@ -4,6 +4,27 @@
 frappe.ui.form.on("Bea Cukai Settings", {
 	refresh(frm) {
 		frm.trigger("update_preview");
+
+		frm.add_custom_button(
+			__("Test Login / Koneksi CEISA 4.0"),
+			function () {
+				frappe.call({
+					method: "bea_cukai_integration.api.ceisa_client.login_ceisa",
+					args: { force: 1 },
+					freeze: true,
+					freeze_message: __("Menghubungkan ke API Gateway CEISA 4.0..."),
+					callback: function (r) {
+						if (r.message && r.message.status === "success") {
+							frappe.show_alert({
+								message: __("Koneksi & Autentikasi CEISA 4.0 Berhasil!"),
+								indicator: "green",
+							});
+							frm.reload_doc();
+						}
+					},
+				});
+			}
+		);
 	},
 	kode_kantor(frm) {
 		frm.trigger("update_preview");
