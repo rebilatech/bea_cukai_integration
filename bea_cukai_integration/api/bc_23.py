@@ -43,6 +43,73 @@ def generate_nomor_aju(doc_type="BC 2.3", tgl_aju=None, with_hyphen=None):
 
 
 @frappe.whitelist()
+def parse_and_validate_no_aju(no_aju):
+	"""
+	Memeriksa dan membedah format 26 digit Nomor Aju Bea Cukai:
+	- 4 digit: Kode Kantor Pabean
+	- 2 digit: Kode Dokumen
+	- 6 digit: Kode Perusahaan
+	- 8 digit: Tanggal (YYYYMMDD)
+	- 6 digit: Nomor Urut
+	"""
+	from datetime import datetime
+
+	if not no_aju:
+		return {
+			"is_valid": False,
+			"message": _("Nomor Aju masih kosong."),
+		}
+
+	clean_no = str(no_aju).replace("-", "").replace(" ", "").strip()
+	length = len(clean_no)
+	if length != 26:
+		return {
+			"is_valid": False,
+			"clean_no": clean_no,
+			"length": length,
+			"message": _("Nomor Aju harus terdiri dari 26 karakter (saat ini {0} karakter).").format(length),
+		}
+
+	kode_kantor = clean_no[0:4]
+	kode_dok = clean_no[4:6]
+	kode_pers = clean_no[6:12]
+	tgl_str = clean_no[12:20]
+	no_urut = clean_no[20:26]
+
+	try:
+		date_obj = datetime.strptime(tgl_str, "%Y%m%d")
+		tgl_formatted = date_obj.strftime("%d-%m-%Y")
+	except Exception:
+		return {
+			"is_valid": False,
+			"clean_no": clean_no,
+			"message": _("Segmen tanggal '{0}' tidak valid (harus format YYYYMMDD).").format(tgl_str),
+		}
+
+	settings = frappe.get_single("Bea Cukai Settings")
+	nama_kantor = settings.nama_kantor if settings.kode_kantor == kode_kantor else f"KPPBC {kode_kantor}"
+	doc_type_name = (
+		"BC 2.3"
+		if kode_dok == "23"
+		else ("BC 2.7" if kode_dok == "27" else ("BC 4.0" if kode_dok == "40" else f"BC {kode_dok}"))
+	)
+
+	return {
+		"is_valid": True,
+		"clean_no": clean_no,
+		"length": 26,
+		"kode_kantor": kode_kantor,
+		"nama_kantor": nama_kantor,
+		"kode_dokumen": kode_dok,
+		"doc_type_name": doc_type_name,
+		"kode_perusahaan": kode_pers,
+		"tanggal_aju": tgl_formatted,
+		"tanggal_raw": tgl_str,
+		"nomor_urut": no_urut,
+		"formatted": f"{kode_kantor}{kode_dok}-{kode_pers}-{tgl_str}-{no_urut}",
+		"tracking_url": f"https://www.beacukai.go.id/tracking?noaju={clean_no}",
+	}
+@frappe.whitelist()
 def make_bc_23_from_po(source_name, target_doc=None):
 	"""
 	Dipanggil dari Purchase Order untuk membuat draft BC_23_Declaration di UI

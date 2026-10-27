@@ -17,13 +17,30 @@ class BC_23_Declaration(Document):
 
 	def validate(self):
 		self.validate_po_reference()
+		self.validate_no_aju()
 		self.calculate_totals()
+
 	def validate_po_reference(self):
 		if self.erp_bc_reference:
 			po_status = frappe.db.get_value("Purchase Order", self.erp_bc_reference, "docstatus")
 			if po_status is None:
 				frappe.throw(_("Purchase Order {0} tidak ditemukan").format(self.erp_bc_reference))
 
+	def validate_no_aju(self):
+		if self.no_aju:
+			from bea_cukai_integration.api.bc_23 import parse_and_validate_no_aju
+			res = parse_and_validate_no_aju(self.no_aju)
+			if not res["is_valid"]:
+				if self.docstatus == 1:
+					frappe.throw(_("Nomor Aju tidak valid: {0}").format(res["message"]))
+				else:
+					frappe.msgprint(_("Peringatan: {0}").format(res["message"]), alert=True)
+			elif res.get("formatted"):
+				settings = frappe.get_single("Bea Cukai Settings")
+				if settings.no_aju_with_hyphen:
+					self.no_aju = res["formatted"]
+				else:
+					self.no_aju = res["clean_no"]
 	def calculate_totals(self):
 		total_amount = sum(flt(item.amount) for item in self.detail_item)
 		if not self.cif_value or self.cif_value == 0:
