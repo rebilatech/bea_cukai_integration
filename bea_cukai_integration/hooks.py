@@ -143,13 +143,11 @@ doctype_js = {"Purchase Order": "public/js/purchase_order.js"}
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Purchase Receipt": {
+		"validate": "bea_cukai_integration.api.bc_23.validate_purchase_receipt_bc_requirement"
+	}
+}
 
 # Scheduled Tasks
 # ---------------

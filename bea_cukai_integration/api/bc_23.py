@@ -170,8 +170,16 @@ def make_bc_23_from_po(source_name, target_doc=None):
 	bc.supplier_name = po.supplier_name or po.supplier
 	bc.currency = po.currency
 
+	has_bc_items = any(
+		frappe.db.get_value("Item", item.item_code, "custom_is_bc") for item in po.items if item.item_code
+	)
+
 	total_cif = 0.0
 	for item in po.items:
+		is_bc = frappe.db.get_value("Item", item.item_code, "custom_is_bc")
+		if has_bc_items and not is_bc:
+			continue
+
 		pending_qty = flt(item.qty) - flt(item.received_qty)
 		qty_to_declare = pending_qty if pending_qty > 0 else flt(item.qty)
 		row_amount = qty_to_declare * flt(item.rate)
@@ -344,7 +352,14 @@ def api_create_bc_23():
 				"warehouse": c_item.get("warehouse") or (ref_po_item.warehouse if ref_po_item else ""),
 			})
 	else:
+		has_bc_items = any(
+			frappe.db.get_value("Item", item.item_code, "custom_is_bc") for item in po.items if item.item_code
+		)
 		for item in po.items:
+			is_bc = frappe.db.get_value("Item", item.item_code, "custom_is_bc")
+			if has_bc_items and not is_bc:
+				continue
+
 			pending_qty = flt(item.qty) - flt(item.received_qty)
 			qty = pending_qty if pending_qty > 0 else flt(item.qty)
 			amount = qty * flt(item.rate)
@@ -480,3 +495,34 @@ def generate_ceisa_payload(bc_name):
 	frappe.db.commit()
 
 	return payload
+
+
+def validate_purchase_receipt_bc_requirement(doc, method=None):
+	"""
+	Penegakan alur penerimaan barang:
+	1. Jika Purchase Receipt sudah memiliki tautan BC (custom_bc_declaration), lolos validasi.
+	2. Jika dibuat langsung tanpa dokumen BC, periksa apakah ada item yang bertanda 'Is BC' (custom_is_bc = 1).
+	3. Jika ada item 'Is BC', tolak pembuatan Purchase Receipt langsung dan wajibkan dokumen BC.
+	4. Jika semua item bukan BC (custom_is_bc = 0), penerimaan barang berjalan normal tanpa dokumen BC.
+	"""
+	if doc.custom_bc_declaration:
+		return
+
+	bc_items = []
+	for item in doc.items:
+		if not item.item_code:
+			continue
+		is_bc = frappe.db.get_value("Item", item.item_code, "custom_is_bc")
+		if is_bc:
+			bc_items.append(f"{item.item_code} ({item.item_name or ''})")
+
+	if bc_items:
+		bullet_list = "<br>• " + "<br>• ".join(bc_items)
+		frappe.throw(
+			_(
+				"Penerimaan barang tidak dapat diproses langsung.<br>"
+				"Item berikut terdaftar sebagai <b>Barang Pabean (Is BC)</b> dan <b>WAJIB</b> melalui Dokumen Bea Cukai (BC 2.3) terlebih dahulu:{0}<br><br>"
+				"Silakan buat dokumen <b>BC 2.3 Declaration</b> dari Purchase Order terkait, lalu tarik menjadi Purchase Receipt."
+			).format(bullet_list),
+			title=_("Wajib Dokumen Pabean (BC)"),
+		)

@@ -168,3 +168,36 @@ class TestBC_23_Declaration(FrappeTestCase):
 
 		# Cleanup
 		frappe.db.sql("DELETE FROM `tabSeries` WHERE name LIKE %s", "NOAJU%20261231")
+
+	def test_is_bc_validation_flow(self):
+		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
+		from bea_cukai_integration.api.bc_23 import validate_purchase_receipt_bc_requirement
+
+		po = frappe.get_all(
+			"Purchase Order",
+			filters={"docstatus": 1, "status": ["in", ["To Receive and Bill", "To Receive"]]},
+			order_by="creation asc",
+			limit=1,
+		)
+		if not po:
+			self.skipTest("Tidak ada PO untuk diuji")
+
+		po_doc = frappe.get_doc("Purchase Order", po[0].name)
+		test_item_code = po_doc.items[0].item_code
+
+		# 1. Kasus A: Item NON-BC (custom_is_bc = 0) -> Berjalan normal tanpa BC
+		frappe.db.set_value("Item", test_item_code, "custom_is_bc", 0)
+		pr_non_bc = make_purchase_receipt(po_doc.name)
+		validate_purchase_receipt_bc_requirement(pr_non_bc)
+
+		# 2. Kasus B: Item BC (custom_is_bc = 1) -> Wajib dokumen BC, diblokir jika tanpa BC
+		frappe.db.set_value("Item", test_item_code, "custom_is_bc", 1)
+		pr_bc_blocked = make_purchase_receipt(po_doc.name)
+		pr_bc_blocked.custom_bc_declaration = None
+		self.assertRaises(frappe.ValidationError, validate_purchase_receipt_bc_requirement, pr_bc_blocked)
+
+		# 3. Kasus C: Item BC dengan referensi dokumen BC -> Lolos validasi
+		pr_bc_blocked.custom_bc_declaration = "BC-TEST-00001"
+		validate_purchase_receipt_bc_requirement(pr_bc_blocked)
+		# Cleanup state item
+		frappe.db.set_value("Item", test_item_code, "custom_is_bc", 0)
