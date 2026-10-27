@@ -43,7 +43,10 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Purchase Order": "public/js/purchase_order.js"}
+doctype_js = {
+	"Purchase Order": "public/js/purchase_order.js",
+	"Sales Order": "public/js/sales_order.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -270,6 +273,18 @@ fixtures = [
 				"Purchase Receipt-custom_bc_no_daftar",
 				"Purchase Receipt-custom_bc_tgl_daftar",
 				"Purchase Receipt Item-custom_hs_code",
+				"Delivery Note-custom_bc_outbound_section",
+				"Delivery Note-custom_bc_outbound",
+				"Delivery Note-custom_bc_outbound_type",
+				"Delivery Note-custom_bc_outbound_no_aju",
+				"Delivery Note-custom_bc_outbound_col_break",
+				"Delivery Note-custom_bc_outbound_tgl_aju",
+				"Delivery Note-custom_bc_outbound_no_daftar",
+				"Delivery Note-custom_bc_outbound_tgl_daftar",
+				"Delivery Note Item-custom_inbound_bc",
+				"Delivery Note Item-custom_inbound_po",
+				"Delivery Note Item-custom_inbound_rate",
+				"Delivery Note Item-custom_hs_code",
 			]]
 		]
 	},
